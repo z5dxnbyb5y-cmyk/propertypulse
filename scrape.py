@@ -14,17 +14,7 @@ FANNIE_CLIENT_ID     = os.environ.get("FANNIE_CLIENT_ID", "")
 FANNIE_CLIENT_SECRET = os.environ.get("FANNIE_CLIENT_SECRET", "")
 FANNIE_BASE          = "https://api.fanniemae.com"
 
-LOGO_SRC = "SVG_PLACEHOLDER" # replaced below
-_LOGO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 52" height="28">
-  <g fill="#4C6DE1">
-    <path d="M18.5 8C13.2 8 9 12.2 9 17.5v17C9 39.8 13.2 44 18.5 44S28 39.8 28 34.5v-4.2l-5.8 5.8c-.6.6-1.4.9-2.2.9s-1.6-.3-2.2-.9c-1.2-1.2-1.2-3.2 0-4.4l5.8-5.8H18.5c-1.7 0-3-1.3-3-3s1.3-3 3-3H28v-2.4C28 12.2 23.8 8 18.5 8z"/>
-    <path d="M38.5 8C33.2 8 29 12.2 29 17.5v2.4h9.5c1.7 0 3 1.3 3 3s-1.3 3-3 3H29v4.2l5.8-5.8c1.2-1.2 3.2-1.2 4.4 0s1.2 3.2 0 4.4L33.4 35H38.5c5.3 0 9.5-4.2 9.5-9.5v-8C48 12.2 43.8 8 38.5 8z"/>
-    <text x="58" y="36" font-family="Inter,Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="-0.5">newzip</text>
-  </g>
-</svg>"""
-# will be embedded as data URI
-import base64 as _b64
-LOGO_SRC = "data:image/svg+xml;base64," + _b64.b64encode(_LOGO_SVG.encode()).decode()
+LOGO_SRC = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCA5MCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE5Ljk5NzcgMC4zOTg5MDVDMTkuMzkwNiAwLjEzNDkyNCAxOC43NDY2IDAgMTguMDgxMyAwQzE3LjQyOTYgMCAxNi43OTczIDAuMTI5MDU3IDE2LjIwMTggMC4zODMyNjJDMTUuNjI3NyAwLjYyNzY4OSAxNS4xMTE3IDAuOTc5NjY0IDE0LjY2NzYgMS40MjU1QzE0LjI0NDcgMS44NTE3OCAxMy45MDcyIDIuMzQ2NSAxMy42NjY3IDIuODk1OTdMMTMuNjYyOCAyLjg4NDI0TDEzLjY1ODkgMi44OTU5N0MxMy4xNzYgMS43OTcwMyAxMi4yOTczIDAuODk1NTgxIDExLjE2MDcgMC4zOTg5MDVDMTAuNTUzNiAwLjEzNDkyNCA5LjkwOTYyIDAgOS4yNDQzMyAwQzguNTkyNjEgMCA3Ljk2MDI4IDAuMTI5MDU3IDcuMzY0ODEgMC4zODMyNjJDNi43OTA2OCAwLjYyNzY4OSA2LjI3NDc0IDAuOTc5NjY0IDUuODMwNTYgMS40MjU1QzUuNDA3NzIgMS44NTE3OCA1LjA3MDIyIDIuMzQ2NSA0LjgyOTcgMi44OTU5N0M0LjgyOTcgMi44OTU5NyAwLjQ2OTM5MyAxMy4wMzA5IDAuNDA3MzI0IDEzLjE3OTVDMC4xMzc3MTQgMTMuNzk3NCAwIDE0LjQ1NDQgMCAxNS4xMzQ5QzAgMTYuMTAyOSAwLjI4MTI0OCAxNy4wMzc1IDAuODE0NjQ5IDE3LjgzOTNDMS4zMzI1MyAxOC42MTk1IDIuMDU3OTYgMTkuMjI5NiAyLjkxMTQgMTkuNjAxMUMzLjUxODUxIDE5Ljg2NTEgNC4xNjI0NyAyMCA0LjgyNzc2IDIwQzUuNDc5NDggMjAgNi4xMTE4MSAxOS44NzA5IDYuNzA3MjggMTkuNjE2N0M3LjI4MTQxIDE5LjM3MjMgNy43OTczNSAxOS4wMjAzIDguMjQxNTMgMTguNTc0NUM4LjY2NDM3IDE4LjE0ODIgOS4wMDE4NyAxNy42NTM1IDkuMjQyMzkgMTcuMTA0TDkuMjQ2MjcgMTcuMTE1OEw5LjI1MDE0IDE3LjEwNEM5LjM2MjY0IDE3LjM1ODIgOS40OTY0OCAxNy42MDQ2IDkuNjUxNjUgMTcuODM5M0MxMC4xNjk1IDE4LjYxOTUgMTAuODk1IDE5LjIyOTYgMTEuNzQ4NCAxOS42MDExQzEyLjM1NTUgMTkuODY1MSAxMi45OTk1IDIwIDEzLjY2NDggMjBDMTQuMzE2NSAyMCAxNC45NDg4IDE5Ljg3MDkgMTUuNTQ0MyAxOS42MTY3QzE2LjExODQgMTkuMzcyMyAxNi42MzQ0IDE5LjAyMDMgMTcuMDc4NSAxOC41NzQ1QzE3LjUwMTQgMTguMTQ4MiAxNy44Mzg5IDE3LjY1MzUgMTguMDc5NCAxNy4xMDRDMTguMDc5NCAxNy4xMDQgMjIuNDM3OCA2Ljk2OTEgMjIuNTAxOCA2LjgyMDQ5QzIyLjc3MzMgNi4yMDI1OCAyMi45MDkxIDUuNTQzNjEgMjIuOTA5MSA0Ljg2MzEyQzIyLjkwNzIgMi45MjMzNSAyMS43NjQ3IDEuMTY5MzQgMTkuOTk3NyAwLjM5ODkwNVpNNS45NzAyMSA0Ljg2NTA4QzUuOTcwMjEgMy4wNDI2MyA3LjQzNjU4IDEuNTY0MzMgOS4yNDQzMyAxLjU2NDMzQzkuNzA1OTYgMS41NjQzMyAxMC4xNDQzIDEuNjYwMTUgMTAuNTQzOSAxLjgzNDE4QzExLjcwNTcgMi4zNDA2MyAxMi41MjA0IDMuNTA4MDIgMTIuNTIwNCA0Ljg2NTA4QzEyLjUyMDQgNS4zMzgyOSAxMi40MjE1IDUuNzg4MDMgMTIuMjQzIDYuMTkyOEMxMi4xOTQ1IDYuMzA2MjIgOS4yNDYyNiAxMy4xNzU2IDkuMjQ0MzMgMTMuMTc1NlYxMy4xNzM2QzkuMTk3NzcgMTMuMDY0MSA2LjM4NzIzIDYuNTE1NDUgNi4yNTE0NiA2LjIwMjU4VjYuMjAwNjNMNi4yNDU2NCA2LjE4Njk0QzYuMDY3MTkgNS43ODQxMiA1Ljk3MDIxIDUuMzM2MzMgNS45NzAyMSA0Ljg2NTA4Wk04LjEwMTg4IDE1LjEzNDlDOC4xMDE4OCAxNi45NTc0IDYuNjM1NTEgMTguNDM1NyA0LjgyNzc2IDE4LjQzNTdDNC4zNjYxMyAxOC40MzU3IDMuOTI3NzcgMTguMzM5OSAzLjUyODIxIDE4LjE2NThDMi4zNjQ0MiAxNy42NTk0IDEuNTUxNzEgMTYuNDkzOSAxLjU1MTcxIDE1LjEzNDlDMS41NTE3MSAxNC42NjE3IDEuNjUwNjMgMTQuMjEyIDEuODI5MDggMTMuODA3MkMxLjg3NzU3IDEzLjY5MzggNC44MjU4MiA2LjgyNDQgNC44MjU4MiA2LjgyNDRDNC44MjU4MiA2LjgyNDQgNy42ODI5MSAxMy40ODI2IDcuODE4NjkgMTMuNzk3NFYxMy43OTk0TDcuODI0NTEgMTMuODEzMUM4LjAwMjk2IDE0LjIxNzggOC4xMDE4OCAxNC42NjU2IDguMTAxODggMTUuMTM0OVpNMTYuOTM4OSAxNS4xMzQ5QzE2LjkzODkgMTYuOTU3NCAxNS40NzI1IDE4LjQzNTcgMTMuNjY0OCAxOC40MzU3QzEzLjIwMzEgMTguNDM1NyAxMi43NjQ4IDE4LjMzOTkgMTIuMzY1MiAxOC4xNjU4QzExLjIwMzQgMTcuNjU5NCAxMC4zODg3IDE2LjQ5MiAxMC4zODg3IDE1LjEzNDlDMTAuMzg4NyAxNC42NjE3IDEwLjQ4NzYgMTQuMjEyIDEwLjY2NjEgMTMuODA3MkMxMC43MTQ2IDEzLjY5MzggMTMuNjY0OCA2LjgyNDQgMTMuNjY0OCA2LjgyNDRDMTMuNjY0OCA2LjgyNDQgMTYuNTIxOSAxMy40ODI2IDE2LjY1NzYgMTMuNzk3NFYxMy43OTk0TDE2LjY2MzQgMTMuODEzMUMxNi44NCAxNC4yMTc4IDE2LjkzODkgMTQuNjY1NiAxNi45Mzg5IDE1LjEzNDlaTTIxLjA4IDYuMTk0NzZDMjEuMDMxNSA2LjMwODE3IDE4LjA4MzMgMTMuMTc3NiAxOC4wODEzIDEzLjE3NzZWMTMuMTc1NkMxOC4wMzQ4IDEzLjA2NjEgMTUuMjI2MiA2LjUyNTIzIDE1LjA4ODUgNi4yMDQ1NEMxNS4wODg1IDYuMjA0NTQgMTUuMDg4NSA2LjIwMjU4IDE1LjA4NjUgNi4yMDI1OEwxNS4wODA3IDYuMTg4ODlDMTQuOTA0MiA1Ljc4NDEyIDE0LjgwNTMgNS4zMzYzMyAxNC44MDUzIDQuODY3MDNDMTQuODA3MiAzLjA0MjYzIDE2LjI3MzYgMS41NjQzMyAxOC4wODEzIDEuNTY0MzNDMTguNTQzIDEuNTY0MzMgMTguOTgxMyAxLjY2MDE1IDE5LjM4MDkgMS44MzQxOEMyMC41NDI3IDIuMzQwNjMgMjEuMzU3NCAzLjUwODAyIDIxLjM1NzQgNC44NjUwOEMyMS4zNTU0IDUuMzM4MjkgMjEuMjU2NSA1Ljc4ODAzIDIxLjA4IDYuMTk0NzZaIiBmaWxsPSIjNEM2REUxIi8+CjxwYXRoIGQ9Ik0zMy4yOTY0IDUuNzI2NjJDMzQuNDc0MSA1LjcyNjYyIDM1LjQyNTggNi4xMTA2OCAzNi4xNTE0IDYuODc4ODFDMzYuODc3MSA3LjYzNDc1IDM3LjIzOTkgOC42OTU1IDM3LjIzOTkgMTAuMDYxMVYxNi4wMDQ5SDM0Ljc0MTdWMTAuNDA4NkMzNC43NDE3IDkuNjAzODUgMzQuNTQ1NSA4Ljk4ODEyIDM0LjE1MjkgOC41NjEzOEMzMy43NjAzIDguMTIyNDUgMzMuMjI1IDcuOTAyOTkgMzIuNTQ3IDcuOTAyOTlDMzEuODU3IDcuOTAyOTkgMzEuMzA5OCA4LjEyMjQ1IDMwLjkwNTMgOC41NjEzOEMzMC41MTI4IDguOTg4MTIgMzAuMzE2NSA5LjYwMzg1IDMwLjMxNjUgMTAuNDA4NlYxNi4wMDQ5SDI3LjgxODRWNS44NzI5M0gzMC4zMTY1VjcuMTM0ODZDMzAuNjQ5NiA2LjY5NTkzIDMxLjA3MTkgNi4zNTQ1MyAzMS41ODM0IDYuMTEwNjhDMzIuMTA2OCA1Ljg1NDY0IDMyLjY3NzggNS43MjY2MiAzMy4yOTY0IDUuNzI2NjJaIiBmaWxsPSIjNEM2REUxIi8+CjxwYXRoIGQ9Ik00OC44OTQyIDEwLjcxOTVDNDguODk0MiAxMS4wODUyIDQ4Ljg3MDQgMTEuNDE0NCA0OC44MjI5IDExLjcwNzFINDEuNTk2MUM0MS42NTU2IDEyLjQzODYgNDEuOTA1NCAxMy4wMTE3IDQyLjM0NTYgMTMuNDI2MkM0Mi43ODU3IDEzLjg0MDggNDMuMzI3IDE0LjA0OCA0My45Njk0IDE0LjA0OEM0NC44OTcyIDE0LjA0OCA0NS41NTc0IDEzLjYzOTYgNDUuOTUgMTIuODIyN0g0OC42NDQ0QzQ4LjM1ODkgMTMuNzk4MSA0Ny44MTE3IDE0LjYwMjggNDcuMDAyOCAxNS4yMzY4QzQ2LjE5MzkgMTUuODU4NiA0NS4yMDA2IDE2LjE2OTUgNDQuMDIyOSAxNi4xNjk1QzQzLjA3MTIgMTYuMTY5NSA0Mi4yMTQ3IDE1Ljk1NjIgNDEuNDUzNCAxNS41Mjk0QzQwLjcwMzkgMTUuMDkwNSA0MC4xMTUxIDE0LjQ3NDggMzkuNjg2OCAxMy42ODIyQzM5LjI3MDUgMTIuODg5NyAzOS4wNjIzIDExLjk3NTMgMzkuMDYyMyAxMC45Mzg5QzM5LjA2MjMgOS44OTAzNyAzOS4yNzA1IDguOTY5ODMgMzkuNjg2OCA4LjE3NzMyQzQwLjEwMzIgNy4zODQ4IDQwLjY4NjEgNi43NzUxOCA0MS40MzU1IDYuMzQ4NDRDNDIuMTg1IDUuOTIxNyA0My4wNDc0IDUuNzA4MzMgNDQuMDIyOSA1LjcwODMzQzQ0Ljk2MjcgNS43MDgzMyA0NS44MDEzIDUuOTE1NiA0Ni41Mzg5IDYuMzMwMTVDNDcuMjg4MyA2Ljc0NDY5IDQ3Ljg2NTIgNy4zMzYwMyA0OC4yNjk3IDguMTA0MTZDNDguNjg2MSA4Ljg2MDEgNDguODk0MiA5LjczMTg3IDQ4Ljg5NDIgMTAuNzE5NVpNNDYuMzA2OSA5Ljk4NzkxQzQ2LjI5NSA5LjMyOTUxIDQ2LjA2MyA4LjgwNTIzIDQ1LjYxMSA4LjQxNTA3QzQ1LjE1ODkgOC4wMTI3MiA0NC42MDU4IDcuODExNTQgNDMuOTUxNSA3LjgxMTU0QzQzLjMzMjkgNy44MTE1NCA0Mi44MDk1IDguMDA2NjIgNDIuMzgxMyA4LjM5Njc4QzQxLjk2NDkgOC43NzQ3NSA0MS43MDkxIDkuMzA1MTMgNDEuNjE0IDkuOTg3OTFINDYuMzA2OVoiIGZpbGw9IiM0QzZERTEiLz4KPHBhdGggZD0iTTY0LjUxMDkgNS44NzI5M0w2MS42MjAyIDE2LjAwNDlINTguOTI1OEw1Ny4xMjM2IDguOTI3MTZMNTUuMzIxMyAxNi4wMDQ5SDUyLjYwOTFMNDkuNzAwNiA1Ljg3MjkzSDUyLjIzNDRMNTMuOTgzMSAxMy41OTA4TDU1Ljg3NDUgNS44NzI5M0g1OC41MTU0TDYwLjM3MTEgMTMuNTcyNUw2Mi4xMTk4IDUuODcyOTNINjQuNTEwOVoiIGZpbGw9IiM0QzZERTEiLz4KPHBhdGggZD0iTTY4LjIzNTggMTMuOTAxN0g3Mi42NDMyVjE2LjAwNDlINjUuMzk4NlYxMy45MzgzTDY5LjcxNjggNy45NzYxNEg2NS40MTY1VjUuODcyOTNINzIuNTg5N1Y3LjkzOTU2TDY4LjIzNTggMTMuOTAxN1oiIGZpbGw9IiM0QzZERTEiLz4KPHBhdGggZD0iTTc1LjkzMzYgNC42NjU4N0M3NS40OTM0IDQuNjY1ODcgNzUuMTI0NiA0LjUyNTY1IDc0LjgyNzIgNC4yNDUyM0M3NC41NDE3IDMuOTUyNiA3NC4zOTkgMy41OTI5MiA3NC4zOTkgMy4xNjYxOUM3NC4zOTkgMi43Mzk0NSA3NC41NDE3IDIuMzg1ODYgNzQuODI3MiAyLjEwNTQzQzc1LjEyNDYgMS44MTI4MSA3NS40OTM0IDEuNjY2NSA3NS45MzM2IDEuNjY2NUM3Ni4zNzM3IDEuNjY2NSA3Ni43MzY1IDEuODEyODEgNzcuMDIyIDIuMTA1NDNDNzcuMzE5NCAyLjM4NTg2IDc3LjQ2ODEgMi43Mzk0NSA3Ny40NjgxIDMuMTY2MTlDNzcuNDY4MSAzLjU5MjkyIDc3LjMxOTQgMy45NTI2IDc3LjAyMiA0LjI0NTIzQzc2LjczNjUgNC41MjU2NSA3Ni4zNzM3IDQuNjY1ODcgNzUuOTMzNiA0LjY2NTg3Wk03Ny4xNjQ4IDUuODcyOTNWMTYuMDA0OUg3NC42NjY3VjUuODcyOTNINzcuMTY0OFoiIGZpbGw9IiM0QzZERTEiLz4KPHBhdGggZD0iTTgyLjIyMDMgNy4zMzYwM0M4Mi41NDE1IDYuODcyNzIgODIuOTgxNiA2LjQ4ODY1IDgzLjU0MDcgNi4xODM4NEM4NC4xMTE3IDUuODY2ODMgODQuNzYwMSA1LjcwODMzIDg1LjQ4NTcgNS43MDgzM0M4Ni4zMzAzIDUuNzA4MzMgODcuMDkxNiA1LjkyMTcgODcuNzY5NyA2LjM0ODQ0Qzg4LjQ1OTcgNi43NzUxOCA4OS4wMDA5IDcuMzg0OCA4OS4zOTM1IDguMTc3MzJDODkuNzk3OSA4Ljk1NzY0IDkwLjAwMDIgOS44NjU5OCA5MC4wMDAyIDEwLjkwMjRDOTAuMDAwMiAxMS45Mzg3IDg5Ljc5NzkgMTIuODU5MyA4OS4zOTM1IDEzLjY2NEM4OS4wMDA5IDE0LjQ1NjUgODguNDU5NyAxNS4wNzIyIDg3Ljc2OTcgMTUuNTExMUM4Ny4wOTE2IDE1Ljk1MDEgODYuMzMwMyAxNi4xNjk1IDg1LjQ4NTcgMTYuMTY5NUM4NC43NjAxIDE2LjE2OTUgODQuMTE3NyAxNi4wMTcxIDgzLjU1ODYgMTUuNzEyM0M4My4wMTE0IDE1LjQwNzUgODIuNTY1MyAxNS4wMjM0IDgyLjIyMDMgMTQuNTYwMVYxOS45OTk4SDc5LjcyMjJWNS44NzI5M0g4Mi4yMjAzVjcuMzM2MDNaTTg3LjQ0ODUgMTAuOTAyNEM4Ny40NDg1IDEwLjI5MjcgODcuMzIzNiA5Ljc2ODQ0IDg3LjA3MzggOS4zMjk1MUM4Ni44MzU5IDguODc4MzkgODYuNTE0NyA4LjUzNyA4Ni4xMTAyIDguMzA1MzRDODUuNzE3NyA4LjA3MzY4IDg1LjI4OTQgNy45NTc4NSA4NC44MjU1IDcuOTU3ODVDODQuMzczNCA3Ljk1Nzg1IDgzLjk0NTIgOC4wNzk3OCA4My41NDA3IDguMzIzNjNDODMuMTQ4MiA4LjU1NTI5IDgyLjgyNyA4Ljg5NjY4IDgyLjU3NzIgOS4zNDc4QzgyLjMzOTIgOS43OTg5MyA4Mi4yMjAzIDEwLjMyOTMgODIuMjIwMyAxMC45Mzg5QzgyLjIyMDMgMTEuNTQ4NiA4Mi4zMzkyIDEyLjA3ODkgODIuNTc3MiAxMi41MzAxQzgyLjgyNyAxMi45ODEyIDgzLjE0ODIgMTMuMzI4NyA4My41NDA3IDEzLjU3MjVDODMuOTQ1MiAxMy44MDQyIDg0LjM3MzQgMTMuOTIgODQuODI1NSAxMy45MkM4NS4yODk0IDEzLjkyIDg1LjcxNzcgMTMuNzk4MSA4Ni4xMTAyIDEzLjU1NDJDODYuNTE0NyAxMy4zMTA0IDg2LjgzNTkgMTIuOTYyOSA4Ny4wNzM4IDEyLjUxMThDODcuMzIzNiAxMi4wNjA2IDg3LjQ0ODUgMTEuNTI0MiA4Ny40NDg1IDEwLjkwMjRaIiBmaWxsPSIjNEM2REUxIi8+Cjwvc3ZnPg=="
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -330,30 +320,70 @@ def fetch_fortune_news():
 # ── MBA / HOUSINGWIRE ─────────────────────────────────────────────────────────
 
 def fetch_mba():
-    print("Fetching MBA via HousingWire RSS...")
+    print("Fetching MBA application data...")
+    weeks, items = [], []
+
+    def parse_items(rss):
+        found = []
+        for m in re.finditer(
+            r'<item>.*?<title>(.*?)</title>.*?<link>(.*?)</link>.*?<pubDate>(.*?)</pubDate>',
+            rss, re.DOTALL | re.IGNORECASE
+        ):
+            raw = m.group(1).strip()
+            url = m.group(2).strip()
+            pub = m.group(3).strip()
+            title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\\1', raw).strip()
+            title = re.sub(r'<[^>]+>', '', title).strip()
+            if not any(k in title.lower() for k in ("application","mba","purchase index")): continue
+            try:
+                dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+                date_str = dt.strftime("%b %d, %Y")
+            except: date_str = pub[:16]
+            pct = re.search(r'(increased|decreased|rose|fell|up|down)\s*([\d.]+)\s*%', title, re.I)
+            val = None
+            if pct:
+                val = float(pct.group(2))
+                if pct.group(1).lower() in ("decreased","fell","down"): val = -val
+            found.append({"title":title,"url":url,"date":date_str,"val":val})
+        return found
+
+    # Try Inman RSS (publicly accessible, sometimes covers MBA data)
+    print("  Trying Inman RSS...")
+    rss = fetch("https://feeds.feedburner.com/inmannews")
+    if rss:
+        for f in parse_items(rss):
+            items.append(f)
+            if f["val"] is not None: weeks.append(f)
+
+    # Try HousingWire RSS
+    print("  Trying HousingWire RSS...")
     rss = fetch("https://www.housingwire.com/feed/")
-    weeks,items = [],[]
-    for m in re.finditer(
-        r'<item>.*?<title><!\[CDATA\[(.*?)\]\]></title>.*?<link>(.*?)</link>.*?<pubDate>(.*?)</pubDate>',
-        rss, re.DOTALL|re.IGNORECASE
-    ):
-        title,url,pub = m.group(1).strip(),m.group(2).strip(),m.group(3).strip()
-        if "application" not in title.lower() and "mba" not in title.lower(): continue
-        try:
-            dt = datetime.datetime.strptime(pub[:25],"%a, %d %b %Y %H:%M")
-            date_str = dt.strftime("%b %d, %Y")
-        except: date_str = pub[:16]
-        pct = re.search(r'(increased|decreased|rose|fell|up|down)\s+([\d.]+)%',title,re.I)
-        val = None
-        if pct:
-            val = float(pct.group(2))
-            if pct.group(1).lower() in ("decreased","fell","down"): val=-val
-        items.append({"title":title,"url":url,"date":date_str})
-        if val is not None: weeks.append({"title":title,"url":url,"date":date_str,"val":val})
+    if rss:
+        for f in parse_items(rss):
+            if not any(i["title"]==f["title"] for i in items):
+                items.append(f)
+                if f["val"] is not None: weeks.append(f)
+
+    # Try MBA newsroom directly
+    print("  Trying MBA newsroom...")
+    html = fetch("https://www.mba.org/news-research-and-resources/research-and-economics/single-family-research/weekly-applications-survey")
+    if html:
+        text = re.sub(r'<[^>]+>', ' ', html)
+        pm = re.findall(r'(increased|decreased)\s+([\d.]+)\s*percent', text, re.I)
+        dm = re.findall(r'week ending\s+(\w+ \d+,?\s*\d{4})', text, re.I)
+        if pm:
+            val = float(pm[0][1])
+            if pm[0][0].lower() == "decreased": val = -val
+            dstr = dm[0] if dm else TODAY_STR
+            entry = {"title": f"MBA: Applications {pm[0][0]} {pm[0][1]}% week ending {dstr}",
+                     "url": "https://www.mba.org/news-research-and-resources/research-and-economics/single-family-research/weekly-applications-survey",
+                     "date": dstr, "val": val}
+            weeks.append(entry)
+            items.append(entry)
+
     print(f"  MBA: {len(weeks)} weeks, {len(items)} items")
     return {"weeks":weeks[:3],"items":items[:3]}
 
-# ── HTML BUILDERS ─────────────────────────────────────────────────────────────
 
 def build_news_items(articles, show_desc=False):
     if not articles:
@@ -945,3 +975,4 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  MBA weeks    : {len(mba.get('weeks',[]))}")
     print(f"{'='*60}\n")
+
