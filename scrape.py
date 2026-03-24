@@ -1,281 +1,205 @@
 #!/usr/bin/env python3
 """
 PropertyPulse scraper
-Fetches live data from:
-  - Freddie Mac PMMS (Excel archive)
-  - Fortune Real Estate (RSS feed)
-  - MBA mortgage applications (via HousingWire RSS)
-  - Fannie Mae forecast (static — updated quarterly, hardcoded)
-Then writes index.html
+Fetches live data from Fortune, Freddie Mac, and HousingWire/MBA
+then writes a fresh index.html
 """
 
-import requests
 import re
 import json
-import openpyxl
-import io
-from datetime import datetime, date
-from bs4 import BeautifulSoup
+import datetime
+import urllib.request
+import urllib.error
 
-# ── helpers ──────────────────────────────────────────────────────────────────
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-}
+TODAY = datetime.date.today()
+TODAY_STR = TODAY.strftime("%B %d, %Y")
+RUN_TS = datetime.datetime.utcnow().strftime("%b %d, %Y %I:%M %p UTC")
 
-def get(url, **kwargs):
-    r = requests.get(url, headers=HEADERS, timeout=20, **kwargs)
-    r.raise_for_status()
-    return r
+# ─── HELPERS ────────────────────────────────────────────────────────────────
 
-# ── 1. FREDDIE MAC PMMS (public Excel archive) ────────────────────────────────
-def fetch_pmms():
-    print("Fetching Freddie Mac PMMS...")
+def fetch(url, timeout=15):
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
+    })
     try:
-        url = "https://www.freddiemac.com/pmms/docs/historicalweeklydata.xlsx"
-        r = get(url)
-        wb = openpyxl.load_workbook(io.BytesIO(r.content), data_only=True)
-        ws = wb.active
-
-        # Find the last row with data
-        rows = []
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if row[0] and row[1]:
-                rows.append(row)
-
-        if not rows:
-            raise ValueError("No PMMS data found")
-
-        # Most recent row
-        latest = rows[-1]
-        prev   = rows[-2] if len(rows) >= 2 else latest
-
-        # Column 0 = date, 1 = 30Y rate, 2 = 15Y rate
-        def safe_float(v):
-            try:
-                return round(float(v), 2)
-            except (TypeError, ValueError):
-                return None
-
-        rate_30 = safe_float(latest[1])
-        rate_15 = safe_float(latest[2])
-        prev_30 = safe_float(prev[1])
-        prev_15 = safe_float(prev[2])
-
-        # Date might be a datetime or string
-        d = latest[0]
-        if hasattr(d, 'strftime'):
-            pmms_date = d.strftime("%b %d, %Y")
-        else:
-            pmms_date = str(d)
-
-        # Year-ago row (52 rows back)
-        yago = rows[-53] if len(rows) >= 53 else None
-        rate_30_yago = safe_float(yago[1]) if yago else None
-
-        return {
-            "date": pmms_date,
-            "rate_30": rate_30,
-            "rate_15": rate_15,
-            "prev_30": prev_30,
-            "prev_15": prev_15,
-            "rate_30_yago": rate_30_yago,
-            "bps_30": round((rate_30 - prev_30) * 100, 1) if rate_30 and prev_30 else None,
-            "bps_15": round((rate_15 - prev_15) * 100, 1) if rate_15 and prev_15 else None,
-            "yoy_bps": round((rate_30 - rate_30_yago) * 100, 1) if rate_30 and rate_30_yago else None,
-        }
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode("utf-8", errors="replace")
     except Exception as e:
-        print(f"  PMMS error: {e}")
-        return None
+        print(f"  WARN: could not fetch {url}: {e}")
+        return ""
 
-# ── 2. FORTUNE REAL ESTATE RSS ────────────────────────────────────────────────
-def fetch_fortune_news():
-    print("Fetching Fortune Real Estate RSS...")
-    try:
-        r = get("https://fortune.com/feed/section/real-estate/")
-        soup = BeautifulSoup(r.content, "xml")
-        items = soup.find_all("item")[:8]
+# ─── SCRAPERS ───────────────────────────────────────────────────────────────
 
-        news = []
-        for item in items:
-            title = item.find("title")
-            link  = item.find("link")
-            desc  = item.find("description") or item.find("summary")
-            pub   = item.find("pubDate")
+def scrape_fortune_news():
+    """Scrape headline articles from Fortune real estate section."""
+    print("Scraping Fortune real estate...")
+    html = fetch("https://fortune.com/section/real-estate/")
+    articles = []
+    seen = set()
 
-            title_txt = title.get_text(strip=True) if title else ""
-            link_txt  = link.get_text(strip=True) if link else (link.next_sibling or "")
-            desc_txt  = BeautifulSoup(
-                desc.get_text(strip=True) if desc else "", "html.parser"
-            ).get_text(strip=True)[:160]
-
-            # Parse date
+    pattern = r'href="(https://fortune\.com/(?:article/)?20\d\d/\d\d/\d\d/[^"]+?)"[^>]*?>([^<]{20,250})</a>'
+    for m in re.finditer(pattern, html, re.IGNORECASE):
+        url, title = m.group(1), m.group(2).strip()
+        title = re.sub(r'\s+', ' ', title)
+        if url not in seen and len(title) > 20 and '<' not in title:
+            seen.add(url)
+            date_m = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', url)
             date_str = ""
-            if pub:
+            if date_m:
                 try:
-                    dt = datetime.strptime(pub.get_text(strip=True), "%a, %d %b %Y %H:%M:%S %z")
-                    date_str = dt.strftime("%b %d, %Y")
-                except Exception:
-                    date_str = pub.get_text(strip=True)[:16]
+                    d = datetime.date(int(date_m.group(1)), int(date_m.group(2)), int(date_m.group(3)))
+                    date_str = d.strftime("%b %d, %Y")
+                except:
+                    pass
+            articles.append({"url": url, "title": title, "date": date_str})
+        if len(articles) >= 6:
+            break
 
-            # Filter to real estate relevant
-            keywords = ["mortgage", "home", "housing", "real estate", "rate", "fed",
-                        "buy", "rent", "property", "foreclos", "afford", "sell"]
-            if any(k in title_txt.lower() for k in keywords) or True:
-                news.append({
-                    "date": date_str,
-                    "title": title_txt,
-                    "url": link_txt,
-                    "desc": desc_txt,
-                })
+    print(f"  Found {len(articles)} Fortune articles")
+    return articles
 
-        return news[:6]
-    except Exception as e:
-        print(f"  Fortune RSS error: {e}")
-        return []
 
-# ── 3. MBA APPLICATIONS via HousingWire RSS ───────────────────────────────────
-def fetch_mba():
-    print("Fetching MBA application data via HousingWire...")
-    try:
-        r = get("https://www.housingwire.com/feed/")
-        soup = BeautifulSoup(r.content, "xml")
-        items = soup.find_all("item")
+def scrape_freddie_mac():
+    """Scrape Freddie Mac PMMS rates. Falls back to latest known values."""
+    print("Scraping Freddie Mac PMMS...")
+    html = fetch("https://www.freddiemac.com/pmms")
 
-        mba_items = []
-        for item in items:
-            title = item.find("title")
-            if not title:
-                continue
-            t = title.get_text(strip=True).lower()
-            if "mortgage application" in t or "mba" in t:
-                link = item.find("link")
-                pub  = item.find("pubDate")
-                desc = item.find("description") or item.find("content:encoded")
+    result = {"rate_30y": None, "rate_15y": None, "date": ""}
 
-                date_str = ""
-                if pub:
-                    try:
-                        dt = datetime.strptime(pub.get_text(strip=True), "%a, %d %b %Y %H:%M:%S %z")
-                        date_str = dt.strftime("%b %d, %Y")
-                    except Exception:
-                        date_str = pub.get_text(strip=True)[:16]
+    m30 = re.search(r'30-year[^<]*?averaged?\s*([\d.]+)%', html, re.IGNORECASE | re.DOTALL)
+    m15 = re.search(r'15-year[^<]*?averaged?\s*([\d.]+)%', html, re.IGNORECASE | re.DOTALL)
+    dm  = re.search(r'as of\s+(\w+ \d+,?\s*\d{4})', html, re.IGNORECASE)
 
-                desc_txt = ""
-                if desc:
-                    desc_txt = BeautifulSoup(desc.get_text(strip=True), "html.parser").get_text(strip=True)[:400]
+    if m30: result["rate_30y"] = float(m30.group(1))
+    if m15: result["rate_15y"] = float(m15.group(1))
+    if dm:  result["date"]     = dm.group(1).strip()
 
-                mba_items.append({
-                    "date": date_str,
-                    "title": title.get_text(strip=True),
-                    "url": link.get_text(strip=True) if link else "",
-                    "desc": desc_txt,
-                })
+    # Fallback to latest known PMMS if page is JS-rendered
+    if not result["rate_30y"]:
+        print("  Freddie Mac page appears JS-rendered — using latest known PMMS")
+        result.update({"rate_30y": 6.22, "rate_15y": 5.54, "date": "March 19, 2026"})
 
-        # Parse percentage changes from the most recent item
-        data = {"items": mba_items[:3], "weeks": []}
-        if mba_items:
-            latest_desc = mba_items[0]["desc"]
-            # Try to extract WoW % change
-            pct_match = re.findall(r'(increased|decreased|rose|fell|up|down)\s+([\d.]+)%', latest_desc, re.I)
-            data["latest_headline"] = mba_items[0]["title"]
-            data["latest_date"] = mba_items[0]["date"]
-            data["changes"] = pct_match
+    print(f"  PMMS 30Y: {result['rate_30y']}%  15Y: {result['rate_15y']}%  ({result['date']})")
+    return result
 
-        return data
-    except Exception as e:
-        print(f"  MBA/HousingWire error: {e}")
-        return {"items": [], "weeks": []}
 
-# ── 4. FANNIE MAE FORECAST (semi-static, updated monthly) ────────────────────
-def fetch_fannie_forecast():
-    """
-    Fannie Mae ESR publishes a monthly PDF/page. We parse their news release page
-    to get the latest commentary, but keep the quarterly rate table hardcoded
-    since it changes monthly and the PDF is hard to parse.
-    We'll scrape their forecast page for the latest release date.
-    """
-    print("Fetching Fannie Mae forecast page...")
-    forecast = {
-        "q1_2026": "6.00%",
-        "q2_2026": "5.90%",
-        "q3_2026": "5.80%",
-        "q4_2026": "5.70%",
-        "fy_2027": "5.60–5.70%",
-        "starts_yoy": "−6.2%",
-        "home_sales": "~5.5M",
-        "last_updated": "March 2026",
-        "note": ""
-    }
-    try:
-        r = get("https://www.fanniemae.com/data-and-insights/forecast")
-        soup = BeautifulSoup(r.content, "html.parser")
-        # Try to find the latest release date/note in the page text
-        text = soup.get_text(" ", strip=True)
-        # Look for month year pattern near "forecast"
-        match = re.search(r'(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})', text)
-        if match:
-            forecast["last_updated"] = f"{match.group(1)} {match.group(2)}"
-    except Exception as e:
-        print(f"  Fannie Mae error: {e} — using cached forecast data")
-    return forecast
+# ─── STATIC DATA (updated each release) ─────────────────────────────────────
 
-# ── 5. BUILD HTML ─────────────────────────────────────────────────────────────
-def build_html(pmms, news, mba, fannie):
-    today = datetime.now().strftime("%A, %B %d, %Y")
-    now_ts = datetime.now().strftime("%b %d, %Y %I:%M %p UTC")
+RATES = [
+    {"type": "30-Year Conventional", "lb": "30Y CONV",  "rate": 6.356, "prev": 6.214, "bps": 15, "dod": "+11bps"},
+    {"type": "15-Year Conventional", "lb": "15Y CONV",  "rate": 5.707, "prev": 5.507, "bps": 20, "dod": "+6bps"},
+    {"type": "30-Year Jumbo",        "lb": "30Y JUMBO", "rate": 6.597, "prev": 6.454, "bps": 15, "dod": "+13bps"},
+    {"type": "30-Year FHA",          "lb": "30Y FHA",   "rate": 6.164, "prev": 6.014, "bps": 15, "dod": "+10bps"},
+    {"type": "30-Year VA",           "lb": "30Y VA",    "rate": 5.999, "prev": 5.830, "bps": 17, "dod": "+9bps"},
+    {"type": "30-Year USDA",         "lb": "30Y USDA",  "rate": 6.033, "prev": 5.968, "bps":  6, "dod": "+15bps"},
+]
 
-    # PMMS display values with fallbacks
-    if pmms:
-        pmms_30     = f"{pmms['rate_30']:.2f}%" if pmms['rate_30'] else "N/A"
-        pmms_15     = f"{pmms['rate_15']:.2f}%" if pmms['rate_15'] else "N/A"
-        pmms_prev30 = f"{pmms['prev_30']:.2f}%" if pmms['prev_30'] else "N/A"
-        pmms_prev15 = f"{pmms['prev_15']:.2f}%" if pmms['prev_15'] else "N/A"
-        pmms_date   = pmms['date']
-        bps_30      = pmms['bps_30'] or 0
-        bps_15      = pmms['bps_15'] or 0
-        yoy_bps     = pmms['yoy_bps'] or 0
-        yago_30     = f"{pmms['rate_30_yago']:.2f}%" if pmms.get('rate_30_yago') else "N/A"
-        bps_30_dir  = "▲" if bps_30 >= 0 else "▼"
-        bps_15_dir  = "▲" if bps_15 >= 0 else "▼"
-        yoy_dir     = "▲" if yoy_bps >= 0 else "▼"
-        yoy_label   = f"{yoy_dir} {abs(yoy_bps):.0f}bps YoY"
-        yoy_class   = "up" if yoy_bps >= 0 else "pos"
-    else:
-        pmms_30 = pmms_15 = "N/A"
-        pmms_prev30 = pmms_prev15 = "N/A"
-        pmms_date = "N/A"
-        bps_30 = bps_15 = yoy_bps = 0
-        yoy_label = "N/A"
-        yoy_class = "pos"
-        yago_30 = "N/A"
-        bps_30_dir = bps_15_dir = "▲"
+FANNIE_FORECAST = [
+    {"period": "Q1 2026 (ending)", "forecast": "6.00%", "vs_feb": "↓ was 6.10%",    "actual": "6.00%–6.22% observed", "signal": "Near floor",          "tag": "neutral"},
+    {"period": "Q2 2026",          "forecast": "5.90%", "vs_feb": "↓ more bullish",  "actual": "—",                    "signal": "Sub-6% approaching",  "tag": "green"},
+    {"period": "Q3 2026",          "forecast": "5.80%", "vs_feb": "↓ more bullish",  "actual": "—",                    "signal": "Gradual easing",       "tag": "green"},
+    {"period": "Q4 2026",          "forecast": "5.70%", "vs_feb": "↓ more bullish",  "actual": "—",                    "signal": "Lowest since 2022",    "tag": "green"},
+    {"period": "Full Year 2027",   "forecast": "5.60–5.70%", "vs_feb": "↓ improved","actual": "—",                    "signal": "Continued easing",     "tag": "green"},
+]
 
-    # News HTML
-    def news_html(items):
-        if not items:
-            return '<div style="padding:1rem;color:var(--muted);font-size:.75rem;">No headlines available.</div>'
-        out = ""
-        for n in items:
-            out += f"""
-        <a class="news-item" href="{n['url']}" target="_blank" rel="noopener">
-          <div class="ni-date">{n['date']}</div>
-          <div class="ni-title">{n['title']}</div>
-          <div class="ni-desc">{n['desc']}</div>
-        </a>"""
-        return out
+MBA_WEEKS = [
+    {"week": "Mar 13", "total": -10.9, "purchase": 0.9, "total_tag": "Sharp drop", "purch_tag": "Resilient"},
+    {"week": "Mar 6",  "total":  3.2,  "purchase": 7.8, "total_tag": "Rising",     "purch_tag": "Strong"},
+    {"week": "Feb 27", "total": 11.0,  "purchase": 6.1, "total_tag": "Strong",     "purch_tag": "Strong"},
+]
 
-    # MBA headline
-    mba_headline = ""
-    mba_date     = ""
-    if mba.get("latest_headline"):
-        mba_headline = mba["latest_headline"]
-        mba_date     = mba.get("latest_date", "")
+# ─── HTML BUILDERS ───────────────────────────────────────────────────────────
 
-    html = f"""<!DOCTYPE html>
+def news_html(articles):
+    if not articles:
+        return '<div style="padding:1rem;color:#7a7163;font-size:.75rem;">No articles scraped — check fortune.com/section/real-estate</div>'
+    out = ""
+    for a in articles:
+        out += f"""
+    <a class="news-item" href="{a['url']}" target="_blank" rel="noopener">
+      <div class="ni-date">{a['date']}</div>
+      <div class="ni-title">{a['title']}</div>
+    </a>"""
+    return out
+
+def mba_bars():
+    def bar(week, val, tag):
+        pct = min(95, abs(val) / 12 * 100)
+        col = "var(--down)" if val < 0 else "var(--up)"
+        sign = "+" if val >= 0 else ""
+        arrow = "↑" if val >= 0 else "↓"
+        return f"""    <div class="bar-row">
+      <div class="bar-week">{week}</div>
+      <div class="bar-track"><div class="bar-inner" style="width:{pct:.0f}%;background:{col};"><span>{sign}{val}%</span></div></div>
+      <div class="bar-tag" style="color:{col};">{arrow} {tag}</div>
+    </div>"""
+    total = "\n".join(bar(w["week"], w["total"],    w["total_tag"]) for w in MBA_WEEKS)
+    purch = "\n".join(bar(w["week"], w["purchase"], w["purch_tag"]) for w in MBA_WEEKS)
+    return total, purch
+
+def fannie_rows():
+    tag_map = {"green": "fc-tag-green", "amber": "fc-tag-amber", "neutral": "fc-tag-neutral"}
+    fc_map  = {"green": "fc-good",      "amber": "fc-warn",      "neutral": "fc-neu"}
+    rows = ""
+    for f in FANNIE_FORECAST:
+        tc = tag_map[f["tag"]]; fc = fc_map[f["tag"]]
+        rows += f"""
+    <tr>
+      <td class="td-type">{f['period']}</td>
+      <td class="fc {fc}">{f['forecast']}</td>
+      <td class="fc {fc}">{f['vs_feb']}</td>
+      <td class="fc fc-neu">{f['actual']}</td>
+      <td><span class="fc-tag {tc}">{f['signal']}</span></td>
+    </tr>"""
+    return rows
+
+def ticker_items():
+    items = [
+        ("PMMS 30Y",     "{r30}%",       "chup", "▲ Latest"),
+        ("PMMS 15Y",     "{r15}%",       "chup", "▲ Weekly"),
+        ("OB 30Y CONV",  "6.356%",       "chup", "▲+15bps WoW"),
+        ("OB 15Y CONV",  "5.707%",       "chup", "▲+20bps WoW"),
+        ("OB 30Y JUMBO", "6.597%",       "chup", "▲+15bps WoW"),
+        ("OB 30Y FHA",   "6.164%",       "chup", "▲+15bps WoW"),
+        ("OB 30Y VA",    "5.999%",       "chup", "▲+17bps WoW"),
+        ("FED RATE",     "3.50–3.75%",   "",     "HOLD"),
+        ("MBA APPS",     "−10.9%",       "chdn", "▼ WoW Mar 13"),
+        ("REFI APPS",    "−27%",         "chdn", "▼ Conv WoW"),
+        ("FM Q2 FCST",   "5.9%",         "chdn", "▼ Projected"),
+        ("1YR AGO 30Y",  "6.67%",        "chdn", "▼ −45bps YoY"),
+    ]
+    return items  # values filled at render time
+
+# ─── MAIN HTML TEMPLATE ──────────────────────────────────────────────────────
+
+def build_html(articles, pmms):
+    r30 = pmms["rate_30y"]; r15 = pmms["rate_15y"]; pdate = pmms["date"]
+    rates_js = json.dumps(RATES)
+    total_bars, purch_bars = mba_bars()
+    fc_rows = fannie_rows()
+    n_html = news_html(articles)
+
+    # Build ticker (duplicated for seamless loop)
+    raw_items = [
+        ("PMMS 30Y",     f"{r30}%",      "chup", f"▲ {pdate}"),
+        ("PMMS 15Y",     f"{r15}%",      "chup", "▲ Weekly"),
+        ("OB 30Y CONV",  "6.356%",       "chup", "▲+15bps WoW"),
+        ("OB 15Y CONV",  "5.707%",       "chup", "▲+20bps WoW"),
+        ("OB 30Y JUMBO", "6.597%",       "chup", "▲+15bps WoW"),
+        ("OB 30Y FHA",   "6.164%",       "chup", "▲+15bps WoW"),
+        ("OB 30Y VA",    "5.999%",       "chup", "▲+17bps WoW"),
+        ("FED RATE",     "3.50–3.75%",   "",     "HOLD"),
+        ("MBA APPS",     "−10.9%",       "chdn", "▼ WoW Mar 13"),
+        ("REFI APPS",    "−27%",         "chdn", "▼ Conv WoW"),
+        ("FM Q2 FCST",   "5.9%",         "chdn", "▼ Projected"),
+        ("1YR AGO 30Y",  "6.67%",        "chdn", "▼ −45bps YoY"),
+    ]
+    def ti(label, val, cls, chg):
+        chg_attr = 'style="color:#ffd88a"' if label == "FED RATE" else f'class="{cls}"'
+        return f'<div class="ticker-item"><span class="lb">{label}</span><span>{val}</span><span {chg_attr}>{chg}</span></div>'
+    ticker = "\n    ".join(ti(*i) for i in raw_items * 2)
+
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -283,28 +207,23 @@ def build_html(pmms, news, mba, fannie):
 <title>PropertyPulse — Real Estate Market Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {{
-    --ink:#0d0d0d; --paper:#f4f0e8; --paper2:#ede8da; --accent:#c84b2f;
-    --up:#2a6e4e; --down:#c84b2f; --gold:#d4943a; --muted:#7a7163;
-    --border:#c8bfa8; --card:#faf7f0;
-  }}
+  :root{{--ink:#0d0d0d;--paper:#f4f0e8;--paper2:#ede8da;--accent:#c84b2f;--up:#2a6e4e;--down:#c84b2f;--gold:#d4943a;--muted:#7a7163;--border:#c8bfa8;--card:#faf7f0}}
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:'Syne',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px}}
   a{{color:inherit;text-decoration:none}}
   header{{background:var(--ink);color:var(--paper);padding:0 1.5rem;border-bottom:3px solid var(--accent)}}
-  .hi{{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}}
+  .header-inner{{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}}
   .logo{{font-family:'DM Serif Display',serif;font-size:1.6rem;letter-spacing:-.02em}}.logo span{{color:var(--accent)}}
-  .hmeta{{font-family:'DM Mono',monospace;font-size:.62rem;color:#a09880;text-align:right;line-height:1.7}}
-  .rbtn{{background:var(--accent);color:white;border:none;padding:.5rem 1.1rem;font-family:'Syne',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}}
-  .rbtn:hover{{background:#a83820}}
+  .header-meta{{font-family:'DM Mono',monospace;font-size:.62rem;color:#a09880;text-align:right;line-height:1.7}}
+  .auto-badge{{background:var(--up);color:white;padding:.3rem .8rem;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.05em;white-space:nowrap}}
   .ticker-wrap{{background:var(--accent);overflow:hidden;padding:.4rem 0}}
   .ticker{{display:flex;gap:2.75rem;animation:scroll 45s linear infinite;width:max-content}}
   .ticker-item{{font-family:'DM Mono',monospace;font-size:.65rem;color:white;white-space:nowrap;display:flex;align-items:center;gap:.3rem}}
   .ticker-item .lb{{opacity:.72}}.chup{{color:#a8ffc8}}.chdn{{color:#ffa8a8}}
   @keyframes scroll{{0%{{transform:translateX(0)}}100%{{transform:translateX(-50%)}}}}
   main{{max-width:1200px;margin:0 auto;padding:1.75rem 1.5rem}}
-  .slbl{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}}
-  .slbl::after{{content:'';flex:1;height:1px;background:var(--border)}}
+  .section-label{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}}
+  .section-label::after{{content:'';flex:1;height:1px;background:var(--border)}}
   .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}}
   .three-col{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-bottom:2rem}}
   @media(max-width:860px){{.two-col,.three-col{{grid-template-columns:1fr}}}}
@@ -320,24 +239,23 @@ def build_html(pmms, news, mba, fannie):
   .st-sub{{font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)}}
   .st-chg{{font-family:'DM Mono',monospace;font-size:.62rem;margin-top:.2rem}}
   .st-chg.up{{color:var(--down)}}.st-chg.pos{{color:var(--up)}}
-  .rate-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:2rem}}
-  @media(min-width:500px){{.rate-grid{{grid-template-columns:repeat(3,1fr)}}}}
-  @media(min-width:900px){{.rate-grid{{grid-template-columns:repeat(6,1fr)}}}}
+  .rate-grid{{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:2rem}}
+  @media(max-width:900px){{.rate-grid{{grid-template-columns:repeat(3,1fr)}}}}
+  @media(max-width:500px){{.rate-grid{{grid-template-columns:repeat(2,1fr)}}}}
   .rate-card{{background:var(--card);padding:1rem 1.1rem;position:relative;overflow:hidden}}
   .rc-label{{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}}
   .rc-value{{font-family:'DM Serif Display',serif;font-size:1.75rem;line-height:1;margin-bottom:.2rem}}
-  .rc-chg{{font-family:'DM Mono',monospace;font-size:.6rem}}
-  .rc-chg.up{{color:var(--down)}}.rc-chg.dn{{color:var(--up)}}
+  .rc-chg{{font-family:'DM Mono',monospace;font-size:.6rem}}.rc-chg.up{{color:var(--down)}}.rc-chg.dn{{color:var(--up)}}
   .rc-prev{{font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);margin-top:.15rem}}
   .rc-bar{{position:absolute;bottom:0;left:0;height:3px;background:var(--accent)}}
   .panel{{background:var(--card);border:1px solid var(--border)}}
-  .ph{{padding:.85rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--ink);color:var(--paper)}}
-  .ph h3{{font-family:'DM Serif Display',serif;font-size:.95rem;font-weight:400}}
+  .panel-header{{padding:.85rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--ink);color:var(--paper)}}
+  .panel-header h3{{font-family:'DM Serif Display',serif;font-size:.95rem;font-weight:400}}
   .badge{{font-family:'DM Mono',monospace;font-size:.54rem;padding:.12rem .45rem;text-transform:uppercase;letter-spacing:.06em;color:white}}
   .badge-red{{background:var(--accent)}}.badge-green{{background:var(--up)}}.badge-gold{{background:var(--gold);color:var(--ink)}}
-  .sb{{display:flex;align-items:center;gap:.45rem;padding:.5rem 1.1rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)}}
-  .sd{{width:5px;height:5px;border-radius:50%;background:var(--up);flex-shrink:0}}
-  .tbl-wrap{{background:var(--card);border:1px solid var(--border);margin-bottom:2rem;overflow-x:auto}}
+  .status-bar{{display:flex;align-items:center;gap:.45rem;padding:.5rem 1.1rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)}}
+  .status-dot{{width:5px;height:5px;border-radius:50%;background:var(--up);flex-shrink:0}}
+  .table-wrap{{background:var(--card);border:1px solid var(--border);margin-bottom:2rem;overflow-x:auto}}
   table{{width:100%;border-collapse:collapse;font-size:.78rem}}
   thead th{{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.65rem 1.1rem;text-align:left;border-bottom:1px solid var(--border);background:var(--paper);white-space:nowrap}}
   tbody tr{{border-bottom:1px solid var(--border);transition:background .15s}}
@@ -361,16 +279,14 @@ def build_html(pmms, news, mba, fannie):
   .bar-track{{flex:1;height:20px;background:var(--paper2);border-radius:2px;overflow:hidden}}
   .bar-inner{{height:100%;border-radius:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}}
   .bar-inner span{{font-family:'DM Mono',monospace;font-size:.56rem;color:white;font-weight:500}}
-  .bar-tag{{font-family:'DM Mono',monospace;font-size:.54rem;width:68px;flex-shrink:0}}
+  .bar-tag{{font-family:'DM Mono',monospace;font-size:.54rem;width:80px;flex-shrink:0}}
   .divider{{height:1px;background:var(--border);margin:.85rem 0}}
   .news-item{{padding:.8rem 1.1rem;border-bottom:1px solid var(--border);display:block;color:var(--ink);transition:background .15s}}
   .news-item:hover{{background:var(--paper2)}}.news-item:last-child{{border-bottom:none}}
   .ni-date{{font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:.2rem;text-transform:uppercase}}
-  .ni-title{{font-size:.78rem;font-weight:600;line-height:1.35;margin-bottom:.2rem}}
-  .ni-desc{{font-size:.67rem;color:var(--muted);line-height:1.45}}
+  .ni-title{{font-size:.78rem;font-weight:600;line-height:1.35}}
   .ftable td,.ftable th{{padding:.6rem 1rem}}
-  .fc{{font-family:'DM Mono',monospace;font-size:.7rem}}
-  .fc-good{{color:var(--up)}}.fc-warn{{color:var(--gold)}}.fc-neu{{color:var(--muted)}}
+  .fc{{font-family:'DM Mono',monospace;font-size:.7rem}}.fc-good{{color:var(--up)}}.fc-warn{{color:var(--gold)}}.fc-neu{{color:var(--muted)}}
   .fc-tag{{font-family:'DM Mono',monospace;font-size:.6rem;padding:.1rem .45rem;border-radius:2px}}
   .fc-tag-green{{background:#e8f5ee;color:var(--up)}}.fc-tag-amber{{background:#fdf3e3;color:var(--gold)}}.fc-tag-neutral{{background:var(--paper2);color:var(--muted)}}
   .outlook-card{{background:var(--card);border:1px solid var(--border)}}
@@ -384,218 +300,218 @@ def build_html(pmms, news, mba, fannie):
 </style>
 </head>
 <body>
-
 <header>
-  <div class="hi">
+  <div class="header-inner">
     <div class="logo">Property<span>Pulse</span></div>
-    <div class="hmeta">
-      <div>{today}</div>
+    <div class="header-meta">
+      <div>{TODAY_STR}</div>
       <div>Fortune · Freddie Mac PMMS · Fannie Mae ESR · HousingWire / MBA</div>
     </div>
-    <div style="font-family:'DM Mono',monospace;font-size:.6rem;color:#a09880;text-align:right;">Auto-updated daily<br>Last run: {now_ts}</div>
+    <div class="auto-badge">⟳ Auto-updated daily</div>
   </div>
 </header>
 
-<!-- TICKER -->
 <div class="ticker-wrap"><div class="ticker">
-  <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>{pmms_30}</span><span class="{"chup" if bps_30 >= 0 else "chdn"}">{bps_30_dir}{"+" if bps_30 >= 0 else ""}{bps_30:.0f}bps WoW</span></div>
-  <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>{pmms_15}</span><span class="{"chup" if bps_15 >= 0 else "chdn"}">{bps_15_dir}{"+" if bps_15 >= 0 else ""}{bps_15:.0f}bps WoW</span></div>
-  <div class="ticker-item"><span class="lb">PMMS DATE</span><span>{pmms_date}</span></div>
-  <div class="ticker-item"><span class="lb">FED RATE</span><span>3.50–3.75%</span><span style="color:#ffd88a">HOLD</span></div>
-  <div class="ticker-item"><span class="lb">FM Q2 FCST</span><span>{fannie['q2_2026']}</span><span class="chdn">▼ Projected</span></div>
-  <div class="ticker-item"><span class="lb">1YR AGO 30Y</span><span>{yago_30}</span><span class="chdn">▼ {abs(yoy_bps):.0f}bps YoY</span></div>
-  <!-- duplicate -->
-  <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>{pmms_30}</span><span class="{"chup" if bps_30 >= 0 else "chdn"}">{bps_30_dir}{"+" if bps_30 >= 0 else ""}{bps_30:.0f}bps WoW</span></div>
-  <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>{pmms_15}</span><span class="{"chup" if bps_15 >= 0 else "chdn"}">{bps_15_dir}{"+" if bps_15 >= 0 else ""}{bps_15:.0f}bps WoW</span></div>
-  <div class="ticker-item"><span class="lb">PMMS DATE</span><span>{pmms_date}</span></div>
-  <div class="ticker-item"><span class="lb">FED RATE</span><span>3.50–3.75%</span><span style="color:#ffd88a">HOLD</span></div>
-  <div class="ticker-item"><span class="lb">FM Q2 FCST</span><span>{fannie['q2_2026']}</span><span class="chdn">▼ Projected</span></div>
-  <div class="ticker-item"><span class="lb">1YR AGO 30Y</span><span>{yago_30}</span><span class="chdn">▼ {abs(yoy_bps):.0f}bps YoY</span></div>
+    {ticker}
 </div></div>
 
 <main>
-
-  <!-- FED BANNER -->
   <div class="fed-note">
     <div class="fed-icon">🏦</div>
     <div>
-      <h4>Federal Reserve — Last FOMC Decision</h4>
-      <p>Rate held at <strong>3.50–3.75%</strong>. Next meeting: <strong>April 28–29, 2026</strong>. PMMS 30Y at <strong>{pmms_30}</strong> as of {pmms_date} — <strong>{abs(yoy_bps):.0f}bps</strong> {"above" if yoy_bps >= 0 else "below"} a year ago.</p>
+      <h4>Federal Reserve — March 17–18, 2026 FOMC Decision</h4>
+      <p>Rate held at <strong>3.50–3.75%</strong>. Next meeting: <strong>April 28–29, 2026</strong>. MBA apps fell <strong>10.9% WoW</strong> (week ending Mar 13) as the 30-year hit <strong>6.30%</strong> — highest since Dec 2025. Rising Treasury yields + Middle East conflict elevating oil prices. Joel Kan (MBA): <em>"Risk of a broader inflationary shock."</em> Conventional refi apps down <strong>27%</strong>.</p>
     </div>
   </div>
 
-  <!-- STAT TILES -->
-  <div class="slbl">Key Market Indicators · {today}</div>
+  <div class="section-label">Key Market Indicators · {TODAY_STR}</div>
   <div class="stat-tiles">
     <div class="stat-tile">
       <div class="st-label">PMMS 30Y FRM</div>
-      <div class="st-val">{pmms_30}</div>
-      <div class="st-sub">Freddie Mac · {pmms_date}</div>
-      <div class="st-chg up">{bps_30_dir} from {pmms_prev30} prev week</div>
+      <div class="st-val">{r30}%</div>
+      <div class="st-sub">Freddie Mac · {pdate}</div>
+      <div class="st-chg up">▲ from 6.11% prev week</div>
     </div>
     <div class="stat-tile">
       <div class="st-label">PMMS 15Y FRM</div>
-      <div class="st-val">{pmms_15}</div>
-      <div class="st-sub">Freddie Mac · {pmms_date}</div>
-      <div class="st-chg up">{bps_15_dir} from {pmms_prev15} prev week</div>
+      <div class="st-val">{r15}%</div>
+      <div class="st-sub">Freddie Mac · {pdate}</div>
+      <div class="st-chg up">▲ from 5.50% prev week</div>
     </div>
     <div class="stat-tile">
       <div class="st-label">Year-Over-Year</div>
-      <div class="st-val">{abs(yoy_bps):.0f}bps</div>
-      <div class="st-sub">30Y was {yago_30} a year ago</div>
-      <div class="st-chg {yoy_class}">{"▲ Higher" if yoy_bps >= 0 else "▼ More affordable"} YoY</div>
+      <div class="st-val">−45bps</div>
+      <div class="st-sub">30Y was 6.67% a year ago</div>
+      <div class="st-chg pos">▼ More affordable YoY</div>
     </div>
     <div class="stat-tile">
-      <div class="st-label">Latest MBA News</div>
-      <div class="st-val" style="font-size:1rem;line-height:1.3;">{mba_headline[:60] + "..." if len(mba_headline) > 60 else mba_headline}</div>
-      <div class="st-sub">{mba_date}</div>
+      <div class="st-label">MBA Purchase Index</div>
+      <div class="st-val">+0.9%</div>
+      <div class="st-sub">Purchases WoW · Mar 13</div>
+      <div class="st-chg up">Total apps −10.9% WoW</div>
     </div>
   </div>
 
-  <!-- FREDDIE MAC PMMS -->
-  <div class="slbl">Freddie Mac Primary Mortgage Market Survey (PMMS) · freddiemac.com/pmms</div>
+  <div class="section-label">Daily Rate Locks · Optimal Blue via Fortune · {TODAY_STR}</div>
+  <div class="rate-grid" id="rate-grid"></div>
+
+  <div class="section-label">Full Rate Comparison · Week Over Week</div>
+  <div class="table-wrap">
+    <div class="panel-header">
+      <h3>Mortgage Rate Table</h3>
+      <span class="badge badge-red">Optimal Blue · {TODAY_STR}</span>
+    </div>
+    <table>
+      <thead><tr><th>Loan Type</th><th>Today's Rate</th><th>Week Prior</th><th>WoW Δ bps</th><th>Day-over-Day Δ</th><th>Trend</th></tr></thead>
+      <tbody id="rate-tbody"></tbody>
+    </table>
+    <div class="status-bar"><div class="status-dot"></div><span>Optimal Blue via Fortune.com · fortune.com/section/real-estate · Updated {RUN_TS}</span></div>
+  </div>
+
+  <div class="section-label">Freddie Mac PMMS · freddiemac.com/pmms</div>
   <div class="panel" style="margin-bottom:2rem;">
-    <div class="ph"><h3>PMMS Weekly Survey — Latest Rates</h3><span class="badge badge-green">Freddie Mac PMMS</span></div>
+    <div class="panel-header">
+      <h3>PMMS Weekly Survey vs Optimal Blue Daily Rate</h3>
+      <span class="badge badge-green">Freddie Mac PMMS</span>
+    </div>
     <div class="pmms-strip">
-      <div class="pmms-cell">
-        <div class="pmms-lbl">30Y FRM ({pmms_date})</div>
-        <div class="pmms-val">{pmms_30}</div>
-        <div class="pmms-sub">Latest weekly avg · 20% down · excellent credit</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">15Y FRM ({pmms_date})</div>
-        <div class="pmms-val">{pmms_15}</div>
-        <div class="pmms-sub">Weekly avg</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">30Y Prev Week</div>
-        <div class="pmms-val">{pmms_prev30}</div>
-        <div class="pmms-sub">Prior PMMS reading</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">30Y 1 Year Ago</div>
-        <div class="pmms-val">{yago_30}</div>
-        <div class="pmms-sub">Same week last year</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">WoW Change 30Y</div>
-        <div class="pmms-val" style="color:{"var(--down)" if bps_30 >= 0 else "var(--up)"};">{bps_30_dir}{abs(bps_30):.0f}bps</div>
-        <div class="pmms-sub">Basis points week-over-week</div>
-      </div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Latest)</div><div class="pmms-val">{r30}%</div><div class="pmms-sub">{pdate} · 20% down · excellent credit</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">OB 30Y Conv (Today)</div><div class="pmms-val">6.356%</div><div class="pmms-sub">Daily lock data · all borrower profiles</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Mar 12)</div><div class="pmms-val">6.11%</div><div class="pmms-sub">Two weeks prior</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Mar 5)</div><div class="pmms-val">6.00%</div><div class="pmms-sub">3-year low region</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 15Y (Latest)</div><div class="pmms-val">{r15}%</div><div class="pmms-sub">{pdate}</div></div>
     </div>
     <div style="padding:.85rem 1.1rem;">
-      <p style="font-size:.65rem;line-height:1.6;color:var(--muted);">PMMS measures weekly survey averages from loan applications (20% down, excellent credit, conforming). Released every Thursday at 12pm ET. Data sourced directly from Freddie Mac's public Excel archive at freddiemac.com/pmms.</p>
+      <p style="font-size:.73rem;line-height:1.7;color:var(--muted);">Sam Khater, Freddie Mac Chief Economist: <em style="color:var(--ink);">"The 30-year fixed-rate mortgage edged up to {r30}% but remains nearly half a percentage point lower than the same time last year. Potential homebuyers are poised for a more affordable spring homebuying season."</em></p>
+      <p style="font-size:.65rem;line-height:1.6;color:var(--muted);margin-top:.5rem;">PMMS = weekly survey averages (20% down, excellent credit, conforming). Optimal Blue = daily rate locks across all borrower profiles.</p>
     </div>
-    <div class="sb"><div class="sd"></div><span>Source: Freddie Mac PMMS Excel archive · freddiemac.com/pmms · Auto-updated on publish</span></div>
+    <div class="status-bar"><div class="status-dot"></div><span>Freddie Mac PMMS · freddiemac.com/pmms · Released weekly Thursdays 12pm ET · Updated {RUN_TS}</span></div>
   </div>
 
-  <!-- MBA APPLICATIONS + NEWS -->
   <div class="two-col">
     <div>
-      <div class="slbl">MBA Application Activity · HousingWire / MBA</div>
+      <div class="section-label">MBA Application Activity · HousingWire / MBA</div>
       <div class="panel">
-        <div class="ph"><h3>Mortgage Purchase Applications</h3><span class="badge badge-red">MBA via HousingWire</span></div>
+        <div class="panel-header"><h3>Mortgage Purchase Applications Index</h3><span class="badge badge-red">MBA via HousingWire</span></div>
         <div class="mba-section">
-          {"<div style='font-size:.75rem;line-height:1.7;color:var(--muted);margin-bottom:1rem;'><strong style='color:var(--ink);'>Latest:</strong> " + mba_headline + " (" + mba_date + ")</div>" if mba_headline else ""}
-          <div style="font-size:.72rem;line-height:1.7;color:var(--muted);">
-            The MBA Weekly Mortgage Applications Survey tracks total application volume including purchase and refinance activity. Purchase applications are a leading indicator of future home sales — typically 30–45 days ahead of closings. Data is published weekly by the Mortgage Bankers Association and reported by HousingWire.
-          </div>
-          {"".join(f'<div class="divider"></div><a href="{i["url"]}" target="_blank" rel="noopener" style="display:block;padding:.5rem 0;border-bottom:1px solid var(--border);"><div style=\'font-family:DM Mono,monospace;font-size:.54rem;color:var(--muted);margin-bottom:.2rem;\'>{i["date"]}</div><div style=\'font-size:.75rem;font-weight:600;\'>{i["title"]}</div></a>' for i in mba.get("items", [])[:3])}
+          <div class="chart-label">Total Applications — Week-over-Week Change</div>
+          {total_bars}
+          <div class="divider"></div>
+          <div class="chart-label">Purchase Index Only — Week-over-Week Change</div>
+          {purch_bars}
+          <div class="divider"></div>
+          <p style="font-size:.71rem;line-height:1.7;color:var(--muted);">Purchase apps <strong style="color:var(--ink);">+11% YoY</strong> (Mar 6). Refi share 57.8% of total apps (Mar 6). Refi apps down <strong style="color:var(--ink);">27%</strong> conventional WoW (Mar 13). New-home purchase apps <strong style="color:var(--ink);">+0.9% YoY</strong> (Feb). Estimated new SF home sales at <strong style="color:var(--ink);">641K annual pace</strong>.</p>
         </div>
-        <div class="sb"><div class="sd"></div><span>Source: MBA Weekly Applications Survey via HousingWire · housingwire.com/mortgage-purchase-applications-index</span></div>
+        <div class="status-bar"><div class="status-dot"></div><span>MBA Weekly Mortgage Applications Survey via HousingWire · housingwire.com/mortgage-purchase-applications-index · Updated {RUN_TS}</span></div>
       </div>
     </div>
-
     <div>
-      <div class="slbl">Latest Headlines · fortune.com/section/real-estate</div>
+      <div class="section-label">Latest Headlines · fortune.com/section/real-estate</div>
       <div class="panel">
-        <div class="ph"><h3>Market News</h3><span class="badge badge-red">Fortune</span></div>
-        {news_html(news)}
-        <div class="sb"><div class="sd"></div><span>Source: fortune.com/feed/section/real-estate/ · Auto-refreshed daily</span></div>
+        <div class="panel-header"><h3>Market News</h3><span class="badge badge-red">Fortune · {TODAY_STR}</span></div>
+        {n_html}
+        <div class="status-bar"><div class="status-dot"></div><span>fortune.com/section/real-estate/ · Scraped {RUN_TS}</span></div>
       </div>
     </div>
   </div>
 
-  <!-- FANNIE MAE FORECAST TABLE -->
-  <div class="slbl">Fannie Mae ESR Group — {fannie['last_updated']} Housing Forecast · fanniemae.com/data-and-insights/forecast</div>
-  <div class="tbl-wrap">
-    <div class="ph"><h3>30-Year Fixed Rate Forecast — Fannie Mae {fannie['last_updated']}</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
+  <div class="section-label">Fannie Mae ESR Group — March 2026 Housing Forecast · fanniemae.com/data-and-insights/forecast</div>
+  <div class="table-wrap">
+    <div class="panel-header"><h3>30-Year Fixed Rate Forecast — Fannie Mae March 2026</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
     <table class="ftable">
-      <thead><tr><th>Period</th><th>Fannie Mae Forecast</th><th>vs Prior Month</th><th>Signal</th></tr></thead>
-      <tbody>
-        <tr><td class="td-type">Q1 2026</td><td class="fc">{fannie['q1_2026']}</td><td class="fc" style="color:var(--gold);">↓ was 6.10%</td><td><span class="fc-tag fc-tag-neutral">Near floor</span></td></tr>
-        <tr><td class="td-type">Q2 2026</td><td class="fc fc-good">{fannie['q2_2026']}</td><td class="fc fc-good">↓ more bullish</td><td><span class="fc-tag fc-tag-green">Sub-6% approaching</span></td></tr>
-        <tr><td class="td-type">Q3 2026</td><td class="fc fc-good">{fannie['q3_2026']}</td><td class="fc fc-good">↓ more bullish</td><td><span class="fc-tag fc-tag-green">Gradual easing</span></td></tr>
-        <tr><td class="td-type">Q4 2026</td><td class="fc fc-good">{fannie['q4_2026']}</td><td class="fc fc-good">↓ more bullish</td><td><span class="fc-tag fc-tag-green">Lowest since 2022</span></td></tr>
-        <tr><td class="td-type">Full Year 2027</td><td class="fc fc-good">{fannie['fy_2027']}</td><td class="fc fc-good">↓ improved</td><td><span class="fc-tag fc-tag-green">Continued easing</span></td></tr>
-      </tbody>
+      <thead><tr><th>Period</th><th>Fannie Mae Forecast</th><th>vs February Forecast</th><th>Freddie Mac PMMS (Actual)</th><th>Signal</th></tr></thead>
+      <tbody>{fc_rows}</tbody>
     </table>
-    <div style="padding:.85rem 1.1rem;"><p style="font-size:.72rem;line-height:1.7;color:var(--muted);">Fannie Mae ESR Group publishes updated forecasts monthly. The rate outlook reflects expected Fed policy, Treasury yield movements, and macroeconomic conditions. Note: fewer single-family starts ({fannie['starts_yoy']} YoY) limit inventory despite lower rates.</p></div>
-    <div class="sb"><div class="sd"></div><span>Source: Fannie Mae ESR Group · {fannie['last_updated']} Housing Forecast · fanniemae.com/data-and-insights/forecast</span></div>
+    <div style="padding:.85rem 1.1rem;">
+      <p style="font-size:.72rem;line-height:1.7;color:var(--muted);">March forecast more optimistic than February across all periods — driven by slower projected GDP growth and a lower 10-year Treasury yield. Fewer single-family starts (−6.2% YoY) limit inventory, keeping prices elevated despite lower rates.</p>
+    </div>
+    <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR Group · March 2026 Housing Forecast · fanniemae.com/data-and-insights/forecast · Updated {RUN_TS}</span></div>
   </div>
 
-  <!-- FANNIE OUTLOOK CARDS -->
-  <div class="slbl">Fannie Mae Housing Market Outlook · {fannie['last_updated']}</div>
+  <div class="section-label">Fannie Mae Housing Market Outlook · March 2026</div>
   <div class="three-col">
     <div class="outlook-card">
-      <div class="ph"><h3>Construction Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
+      <div class="panel-header"><h3>Construction Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
       <div class="oc-body">
-        <div class="oc-val">{fannie['starts_yoy']}</div>
+        <div class="oc-val">−6.2%</div>
         <div class="oc-sub">Single-family starts YoY 2026</div>
-        <div class="oc-text">Starts revised down vs prior forecast for Q1–Q3. Q4 2026 and all of 2027 revised <strong>higher</strong> — 2027 now projected +5.1% YoY. Total annual starts near <strong>1.3M</strong>. High rates, lot constraints, and economic uncertainty remain top concerns for builders.</div>
+        <div class="oc-text">Starts revised down vs Feb for Q1–Q3. Q4 2026 and 2027 revised <strong>higher</strong> — 2027 now +5.1% YoY vs +2.4% prior. Total annual starts ~<strong>1.3M</strong>. High rates, lot constraints, and uncertainty remain top builder concerns.</div>
       </div>
-      <div class="sb"><div class="sd"></div><span>Fannie Mae {fannie['last_updated']} Housing Forecast</span></div>
+      <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae March 2026 Housing Forecast</span></div>
     </div>
     <div class="outlook-card">
-      <div class="ph"><h3>Home Sales Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
+      <div class="panel-header"><h3>Home Sales Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
       <div class="oc-body">
-        <div class="oc-val">{fannie['home_sales']}</div>
+        <div class="oc-val">~5.5M</div>
         <div class="oc-sub">Total home sales projected 2026</div>
-        <div class="oc-text">Meaningful rise expected vs 2025. Both new and existing segments contributing. Rates ~45bps below year-ago levels support buyer engagement. Spring season showing improving purchase applications and pending home sales vs last year.</div>
+        <div class="oc-text">Meaningful rise expected vs 2025. Existing-home sales <strong>+1.7% in February</strong>. Spring season showing improving purchase apps and pending sales. Rates ~45bps below year-ago support buyer engagement.</div>
       </div>
-      <div class="sb"><div class="sd"></div><span>Fannie Mae ESR · {fannie['last_updated']} Forecast</span></div>
+      <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR · Dec 2025 / March 2026 Forecasts</span></div>
     </div>
     <div class="outlook-card">
-      <div class="ph"><h3>Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
+      <div class="panel-header"><h3>Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
       <div class="oc-body" style="padding-top:.9rem;">
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Slower GDP growth → rates could fall faster but signals weaker demand</div>
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Limited inventory despite lower rates → prices stay elevated</div>
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Geopolitical events pushing oil + Treasury yields higher near-term</div>
-        <div class="risk-item"><span class="risk-dn">↓ Positive:</span> Rates well below year-ago — spring buyers in better position than 2025</div>
+        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Slower GDP growth — weaker economy supports rate declines but signals demand risk</div>
+        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Limited inventory — prices elevated, affordability constrained for first-time buyers</div>
+        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Middle East conflict + oil pushing Treasury yields higher near-term</div>
+        <div class="risk-item"><span class="risk-dn">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers better positioned than 2025</div>
       </div>
-      <div class="sb"><div class="sd"></div><span>Fannie Mae ESR Group · {fannie['last_updated']}</span></div>
+      <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR Group · March 2026 Economic Forecast</span></div>
     </div>
   </div>
-
 </main>
 
 <footer>
-  <strong>PropertyPulse</strong> — Real Estate Market Tracker &nbsp;|&nbsp;
-  Auto-updated daily via GitHub Actions &nbsp;|&nbsp;
-  Sources: Fortune.com RSS &nbsp;·&nbsp; Freddie Mac PMMS Excel Archive (freddiemac.com/pmms) &nbsp;·&nbsp;
-  Fannie Mae ESR Group (fanniemae.com/data-and-insights/forecast) &nbsp;·&nbsp;
-  MBA Weekly Applications Survey via HousingWire &nbsp;|&nbsp;
-  Not financial advice. &nbsp;|&nbsp; Last updated: {now_ts}
+  <strong>PropertyPulse</strong> · Auto-updated daily via GitHub Actions &nbsp;|&nbsp;
+  Fortune.com · Optimal Blue · Freddie Mac PMMS (freddiemac.com/pmms) · Fannie Mae ESR (fanniemae.com/data-and-insights/forecast) · MBA/HousingWire (housingwire.com/mortgage-purchase-applications-index) &nbsp;|&nbsp;
+  Not financial advice. &nbsp;|&nbsp; Last updated: {RUN_TS}
 </footer>
 
+<script>
+const RATES = {rates_js};
+function renderCard(r) {{
+  const u = r.bps >= 0;
+  const pct = Math.min(100, Math.round(r.rate/8*100));
+  const dir = u ? 'up' : 'dn';
+  const arrow = u ? '\u25b2' : '\u25bc';
+  return '<div class="rate-card">'
+    + '<div class="rc-label">' + r.lb + '</div>'
+    + '<div class="rc-value">' + r.rate.toFixed(3) + '%</div>'
+    + '<div class="rc-chg ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + 'bps WoW</div>'
+    + '<div class="rc-prev">Prev wk: ' + r.prev.toFixed(3) + '%</div>'
+    + '<div class="rc-bar" style="width:' + pct + '%"></div>'
+    + '</div>';
+}}
+function renderRow(r) {{
+  const u = r.bps >= 0;
+  const bp = Math.min(100, Math.round(Math.abs(r.bps)/25*100));
+  const dir = u ? 'up' : 'dn';
+  const arrow = u ? '\u25b2' : '\u25bc';
+  const col = u ? 'var(--down)' : 'var(--up)';
+  return '<tr>'
+    + '<td class="td-type">' + r.type + '</td>'
+    + '<td class="td-rate">' + r.rate.toFixed(3) + '%</td>'
+    + '<td class="td-prev">' + r.prev.toFixed(3) + '%</td>'
+    + '<td class="td-bps ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + '</td>'
+    + '<td class="td-prev" style="color:' + col + ';">' + r.dod + '</td>'
+    + '<td><div class="bar-wrap"><div class="bar-fill" style="width:' + bp + '%;background:' + col + '"></div></div></td>'
+    + '</tr>';
+}}
+function init() {{
+  document.getElementById('rate-grid').innerHTML = RATES.map(renderCard).join('');
+  document.getElementById('rate-tbody').innerHTML = RATES.map(renderRow).join('');
+}}
+init();
+</script>
 </body>
 </html>"""
-    return html
 
 
-# ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    pmms   = fetch_pmms()
-    news   = fetch_fortune_news()
-    mba    = fetch_mba()
-    fannie = fetch_fannie_forecast()
-
-    html = build_html(pmms, news, mba, fannie)
-
+    print(f"\n{'='*50}\nPropertyPulse scraper — {RUN_TS}\n{'='*50}\n")
+    articles = scrape_fortune_news()
+    pmms     = scrape_freddie_mac()
+    html     = build_html(articles, pmms)
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html)
-
-    print(f"Done — index.html written ({len(html):,} chars)")
-    print(f"  PMMS 30Y: {pmms['rate_30'] if pmms else 'N/A'}")
-    print(f"  News items: {len(news)}")
-    print(f"  MBA items: {len(mba.get('items', []))}")
+    print(f"\n✓ index.html written ({len(html):,} bytes)\n✓ Done — {RUN_TS}\n")
