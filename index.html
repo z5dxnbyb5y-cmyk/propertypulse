@@ -6,230 +6,158 @@
 <title>PropertyPulse — Real Estate Market Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --ink: #0d0d0d;
-    --paper: #f4f0e8;
-    --paper2: #ede8da;
-    --accent: #c84b2f;
-    --up: #2a6e4e;
-    --down: #c84b2f;
-    --gold: #d4943a;
-    --muted: #7a7163;
-    --border: #c8bfa8;
-    --card: #faf7f0;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Syne', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; font-size: 14px; }
-  a { color: inherit; text-decoration: none; }
-
-  /* HEADER */
-  header { background: var(--ink); color: var(--paper); padding: 0 1.5rem; border-bottom: 3px solid var(--accent); }
-  .header-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; }
-  .logo { font-family: 'DM Serif Display', serif; font-size: 1.6rem; letter-spacing: -0.02em; }
-  .logo span { color: var(--accent); }
-  .header-meta { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: #a09880; text-align: right; line-height: 1.7; }
-  .refresh-btn { background: var(--accent); color: white; border: none; padding: 0.5rem 1.1rem; font-family: 'Syne', sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
-  .refresh-btn:hover { background: #a83820; }
-
-  /* TICKER */
-  .ticker-wrap { background: var(--accent); overflow: hidden; padding: 0.4rem 0; }
-  .ticker { display: flex; gap: 2.75rem; animation: scroll 45s linear infinite; width: max-content; }
-  .ticker-item { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: white; white-space: nowrap; display: flex; align-items: center; gap: 0.3rem; }
-  .ticker-item .lb { opacity: 0.72; }
-  .chup { color: #a8ffc8; }
-  .chdn { color: #ffa8a8; }
-  @keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-
-  /* LAYOUT */
-  main { max-width: 1200px; margin: 0 auto; padding: 1.75rem 1.5rem; }
-  .section-label { font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.65rem; display: flex; align-items: center; gap: 0.5rem; }
-  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
-  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
-  @media (max-width: 860px) { .two-col, .three-col { grid-template-columns: 1fr; } }
-
-  /* FED BANNER */
-  .fed-note { background: var(--ink); color: var(--paper); padding: 1.25rem 1.5rem; margin-bottom: 2rem; border-left: 4px solid var(--gold); display: flex; gap: 1.25rem; align-items: flex-start; }
-  .fed-icon { font-size: 1.8rem; flex-shrink: 0; opacity: 0.7; }
-  .fed-note h4 { font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.35rem; }
-  .fed-note p { font-size: 0.76rem; line-height: 1.65; color: #ccc; }
-  .fed-note strong { color: white; }
-
-  /* STAT TILES */
-  .stat-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 2rem; }
-  @media (max-width: 700px) { .stat-tiles { grid-template-columns: repeat(2, 1fr); } }
-  .stat-tile { background: var(--card); padding: 1rem 1.1rem; }
-  .st-label { font-family: 'DM Mono', monospace; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.3rem; }
-  .st-val { font-family: 'DM Serif Display', serif; font-size: 1.7rem; line-height: 1; margin-bottom: 0.2rem; }
-  .st-sub { font-family: 'DM Mono', monospace; font-size: 0.56rem; color: var(--muted); }
-  .st-chg { font-family: 'DM Mono', monospace; font-size: 0.62rem; margin-top: 0.2rem; }
-  .st-chg.up { color: var(--down); }
-  .st-chg.pos { color: var(--up); }
-
-  /* RATE CARDS */
-  .rate-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 2rem; }
-  @media (max-width: 900px) { .rate-grid { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 500px) { .rate-grid { grid-template-columns: repeat(2, 1fr); } }
-  .rate-card { background: var(--card); padding: 1rem 1.1rem; position: relative; overflow: hidden; }
-  .rc-label { font-family: 'DM Mono', monospace; font-size: 0.54rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.3rem; }
-  .rc-value { font-family: 'DM Serif Display', serif; font-size: 1.75rem; line-height: 1; margin-bottom: 0.2rem; }
-  .rc-chg { font-family: 'DM Mono', monospace; font-size: 0.6rem; }
-  .rc-chg.up { color: var(--down); }
-  .rc-chg.dn { color: var(--up); }
-  .rc-prev { font-family: 'DM Mono', monospace; font-size: 0.54rem; color: var(--muted); margin-top: 0.15rem; }
-  .rc-bar { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--accent); }
-
-  /* PANELS */
-  .panel { background: var(--card); border: 1px solid var(--border); }
-  .panel-header { padding: 0.85rem 1.1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--ink); color: var(--paper); }
-  .panel-header h3 { font-family: 'DM Serif Display', serif; font-size: 0.95rem; font-weight: 400; }
-  .badge { font-family: 'DM Mono', monospace; font-size: 0.54rem; padding: 0.12rem 0.45rem; text-transform: uppercase; letter-spacing: 0.06em; color: white; }
-  .badge-red   { background: var(--accent); }
-  .badge-green { background: var(--up); }
-  .badge-gold  { background: var(--gold); color: var(--ink); }
-  .status-bar { display: flex; align-items: center; gap: 0.45rem; padding: 0.5rem 1.1rem; background: var(--paper); border-top: 1px solid var(--border); font-family: 'DM Mono', monospace; font-size: 0.56rem; color: var(--muted); }
-  .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--up); flex-shrink: 0; }
-
-  /* RATE TABLE */
-  .table-wrap { background: var(--card); border: 1px solid var(--border); margin-bottom: 2rem; overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
-  thead th { font-family: 'DM Mono', monospace; font-size: 0.54rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0.65rem 1.1rem; text-align: left; border-bottom: 1px solid var(--border); background: var(--paper); white-space: nowrap; }
-  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
-  tbody tr:hover { background: var(--paper2); }
-  tbody tr:last-child { border-bottom: none; }
-  tbody td { padding: 0.7rem 1.1rem; vertical-align: middle; }
-  .td-type { font-weight: 700; }
-  .td-rate { font-family: 'DM Serif Display', serif; font-size: 1.15rem; }
-  .td-prev { font-family: 'DM Mono', monospace; font-size: 0.66rem; color: var(--muted); }
-  .td-bps { font-family: 'DM Mono', monospace; font-size: 0.7rem; font-weight: 500; }
-  .td-bps.up { color: var(--down); }
-  .td-bps.dn { color: var(--up); }
-  .bar-wrap { width: 60px; height: 4px; background: var(--paper2); border-radius: 2px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 2px; }
-
-  /* PMMS STRIP */
-  .pmms-strip { display: flex; gap: 1px; background: var(--border); }
-  .pmms-cell { flex: 1; background: var(--card); padding: 0.75rem 1rem; }
-  .pmms-lbl { font-family: 'DM Mono', monospace; font-size: 0.54rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.2rem; }
-  .pmms-val { font-family: 'DM Serif Display', serif; font-size: 1.35rem; line-height: 1; }
-  .pmms-sub { font-family: 'DM Mono', monospace; font-size: 0.52rem; color: var(--muted); margin-top: 0.15rem; }
-
-  /* MBA CHART */
-  .mba-section { padding: 1rem 1.1rem; }
-  .chart-label { font-family: 'DM Mono', monospace; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 0.65rem; }
-  .bar-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
-  .bar-week { font-family: 'DM Mono', monospace; font-size: 0.58rem; color: var(--muted); width: 52px; flex-shrink: 0; text-align: right; }
-  .bar-track { flex: 1; height: 20px; background: var(--paper2); border-radius: 2px; overflow: hidden; }
-  .bar-inner { height: 100%; border-radius: 2px; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; }
-  .bar-inner span { font-family: 'DM Mono', monospace; font-size: 0.56rem; color: white; font-weight: 500; }
-  .bar-tag { font-family: 'DM Mono', monospace; font-size: 0.54rem; width: 68px; flex-shrink: 0; }
-  .divider { height: 1px; background: var(--border); margin: 0.85rem 0; }
-
-  /* NEWS */
-  .news-item { padding: 0.8rem 1.1rem; border-bottom: 1px solid var(--border); display: block; color: var(--ink); transition: background 0.15s; }
-  .news-item:hover { background: var(--paper2); }
-  .news-item:last-child { border-bottom: none; }
-  .ni-date  { font-family: 'DM Mono', monospace; font-size: 0.54rem; color: var(--muted); margin-bottom: 0.2rem; text-transform: uppercase; }
-  .ni-title { font-size: 0.78rem; font-weight: 600; line-height: 1.35; margin-bottom: 0.2rem; }
-  .ni-desc  { font-size: 0.67rem; color: var(--muted); line-height: 1.45; }
-
-  /* FANNIE FORECAST TABLE */
-  .ftable td, .ftable th { padding: 0.6rem 1rem; }
-  .fc { font-family: 'DM Mono', monospace; font-size: 0.7rem; }
-  .fc-good { color: var(--up); }
-  .fc-warn { color: var(--gold); }
-  .fc-neu  { color: var(--muted); }
-  .fc-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; padding: 0.1rem 0.45rem; border-radius: 2px; }
-  .fc-tag-green   { background: #e8f5ee; color: var(--up); }
-  .fc-tag-amber   { background: #fdf3e3; color: var(--gold); }
-  .fc-tag-neutral { background: var(--paper2); color: var(--muted); }
-
-  /* OUTLOOK CARDS */
-  .outlook-card { background: var(--card); border: 1px solid var(--border); }
-  .oc-body { padding: 1rem 1.1rem; }
-  .oc-val { font-family: 'DM Serif Display', serif; font-size: 1.8rem; line-height: 1; margin-bottom: 0.25rem; }
-  .oc-sub { font-family: 'DM Mono', monospace; font-size: 0.55rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.7rem; letter-spacing: 0.07em; }
-  .oc-text { font-size: 0.73rem; line-height: 1.65; color: var(--muted); }
-  .oc-text strong { color: var(--ink); }
-  .risk-item { font-size: 0.72rem; line-height: 1.65; color: var(--muted); margin-bottom: 0.4rem; }
-  .risk-item:last-child { margin-bottom: 0; }
-  .risk-up { color: var(--down); font-weight: 700; }
-  .risk-dn { color: var(--up); font-weight: 700; }
-
-  footer { max-width: 1200px; margin: 0 auto; padding: 1.25rem 1.5rem; font-family: 'DM Mono', monospace; font-size: 0.55rem; color: var(--muted); border-top: 1px solid var(--border); line-height: 1.8; }
+  :root{--ink:#0d0d0d;--paper:#f4f0e8;--paper2:#ede8da;--accent:#c84b2f;--up:#2a6e4e;--down:#c84b2f;--gold:#d4943a;--muted:#7a7163;--border:#c8bfa8;--card:#faf7f0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Syne',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px}
+  a{color:inherit;text-decoration:none}
+  header{background:var(--ink);color:var(--paper);padding:0 1.5rem;border-bottom:3px solid var(--accent)}
+  .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}
+  .logo{font-family:'DM Serif Display',serif;font-size:1.6rem;letter-spacing:-.02em}.logo span{color:var(--accent)}
+  .header-meta{font-family:'DM Mono',monospace;font-size:.62rem;color:#a09880;text-align:right;line-height:1.7}
+  .auto-badge{background:var(--up);color:white;padding:.3rem .8rem;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.05em;white-space:nowrap}
+  .ticker-wrap{background:var(--accent);overflow:hidden;padding:.4rem 0}
+  .ticker{display:flex;gap:2.75rem;animation:scroll 45s linear infinite;width:max-content}
+  .ticker-item{font-family:'DM Mono',monospace;font-size:.65rem;color:white;white-space:nowrap;display:flex;align-items:center;gap:.3rem}
+  .ticker-item .lb{opacity:.72}.chup{color:#a8ffc8}.chdn{color:#ffa8a8}
+  @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  main{max-width:1200px;margin:0 auto;padding:1.75rem 1.5rem}
+  .section-label{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
+  .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-bottom:2rem}
+  @media(max-width:860px){.two-col,.three-col{grid-template-columns:1fr}}
+  .fed-note{background:var(--ink);color:var(--paper);padding:1.25rem 1.5rem;margin-bottom:2rem;border-left:4px solid var(--gold);display:flex;gap:1.25rem;align-items:flex-start}
+  .fed-icon{font-size:1.8rem;flex-shrink:0;opacity:.7}
+  .fed-note h4{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.35rem}
+  .fed-note p{font-size:.76rem;line-height:1.65;color:#ccc}.fed-note strong{color:white}
+  .stat-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:2rem}
+  @media(max-width:700px){.stat-tiles{grid-template-columns:repeat(2,1fr)}}
+  .stat-tile{background:var(--card);padding:1rem 1.1rem}
+  .st-label{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.3rem}
+  .st-val{font-family:'DM Serif Display',serif;font-size:1.7rem;line-height:1;margin-bottom:.2rem}
+  .st-sub{font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)}
+  .st-chg{font-family:'DM Mono',monospace;font-size:.62rem;margin-top:.2rem}
+  .st-chg.up{color:var(--down)}.st-chg.pos{color:var(--up)}
+  .rate-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:2rem}
+  @media(max-width:900px){.rate-grid{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:500px){.rate-grid{grid-template-columns:repeat(2,1fr)}}
+  .rate-card{background:var(--card);padding:1rem 1.1rem;position:relative;overflow:hidden}
+  .rc-label{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+  .rc-value{font-family:'DM Serif Display',serif;font-size:1.75rem;line-height:1;margin-bottom:.2rem}
+  .rc-chg{font-family:'DM Mono',monospace;font-size:.6rem}.rc-chg.up{color:var(--down)}.rc-chg.dn{color:var(--up)}
+  .rc-prev{font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);margin-top:.15rem}
+  .rc-bar{position:absolute;bottom:0;left:0;height:3px;background:var(--accent)}
+  .panel{background:var(--card);border:1px solid var(--border)}
+  .panel-header{padding:.85rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--ink);color:var(--paper)}
+  .panel-header h3{font-family:'DM Serif Display',serif;font-size:.95rem;font-weight:400}
+  .badge{font-family:'DM Mono',monospace;font-size:.54rem;padding:.12rem .45rem;text-transform:uppercase;letter-spacing:.06em;color:white}
+  .badge-red{background:var(--accent)}.badge-green{background:var(--up)}.badge-gold{background:var(--gold);color:var(--ink)}
+  .status-bar{display:flex;align-items:center;gap:.45rem;padding:.5rem 1.1rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)}
+  .status-dot{width:5px;height:5px;border-radius:50%;background:var(--up);flex-shrink:0}
+  .table-wrap{background:var(--card);border:1px solid var(--border);margin-bottom:2rem;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.78rem}
+  thead th{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.65rem 1.1rem;text-align:left;border-bottom:1px solid var(--border);background:var(--paper);white-space:nowrap}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
+  tbody tr:hover{background:var(--paper2)}tbody tr:last-child{border-bottom:none}
+  tbody td{padding:.7rem 1.1rem;vertical-align:middle}
+  .td-type{font-weight:700}.td-rate{font-family:'DM Serif Display',serif;font-size:1.15rem}
+  .td-prev{font-family:'DM Mono',monospace;font-size:.66rem;color:var(--muted)}
+  .td-bps{font-family:'DM Mono',monospace;font-size:.7rem;font-weight:500}
+  .td-bps.up{color:var(--down)}.td-bps.dn{color:var(--up)}
+  .bar-wrap{width:60px;height:4px;background:var(--paper2);border-radius:2px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:2px}
+  .pmms-strip{display:flex;gap:1px;background:var(--border)}
+  .pmms-cell{flex:1;background:var(--card);padding:.75rem 1rem}
+  .pmms-lbl{font-family:'DM Mono',monospace;font-size:.54rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+  .pmms-val{font-family:'DM Serif Display',serif;font-size:1.35rem;line-height:1}
+  .pmms-sub{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:.15rem}
+  .mba-section{padding:1rem 1.1rem}
+  .chart-label{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.65rem}
+  .bar-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
+  .bar-week{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);width:52px;flex-shrink:0;text-align:right}
+  .bar-track{flex:1;height:20px;background:var(--paper2);border-radius:2px;overflow:hidden}
+  .bar-inner{height:100%;border-radius:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
+  .bar-inner span{font-family:'DM Mono',monospace;font-size:.56rem;color:white;font-weight:500}
+  .bar-tag{font-family:'DM Mono',monospace;font-size:.54rem;width:80px;flex-shrink:0}
+  .divider{height:1px;background:var(--border);margin:.85rem 0}
+  .news-item{padding:.8rem 1.1rem;border-bottom:1px solid var(--border);display:block;color:var(--ink);transition:background .15s}
+  .news-item:hover{background:var(--paper2)}.news-item:last-child{border-bottom:none}
+  .ni-date{font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:.2rem;text-transform:uppercase}
+  .ni-title{font-size:.78rem;font-weight:600;line-height:1.35}
+  .ftable td,.ftable th{padding:.6rem 1rem}
+  .fc{font-family:'DM Mono',monospace;font-size:.7rem}.fc-good{color:var(--up)}.fc-warn{color:var(--gold)}.fc-neu{color:var(--muted)}
+  .fc-tag{font-family:'DM Mono',monospace;font-size:.6rem;padding:.1rem .45rem;border-radius:2px}
+  .fc-tag-green{background:#e8f5ee;color:var(--up)}.fc-tag-amber{background:#fdf3e3;color:var(--gold)}.fc-tag-neutral{background:var(--paper2);color:var(--muted)}
+  .outlook-card{background:var(--card);border:1px solid var(--border)}
+  .oc-body{padding:1rem 1.1rem}
+  .oc-val{font-family:'DM Serif Display',serif;font-size:1.8rem;line-height:1;margin-bottom:.25rem}
+  .oc-sub{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem;letter-spacing:.07em}
+  .oc-text{font-size:.73rem;line-height:1.65;color:var(--muted)}.oc-text strong{color:var(--ink)}
+  .risk-item{font-size:.72rem;line-height:1.65;color:var(--muted);margin-bottom:.4rem}.risk-item:last-child{margin-bottom:0}
+  .risk-up{color:var(--down);font-weight:700}.risk-dn{color:var(--up);font-weight:700}
+  footer{max-width:1200px;margin:0 auto;padding:1.25rem 1.5rem;font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted);border-top:1px solid var(--border);line-height:1.8}
 </style>
 </head>
 <body>
-
-<!-- HEADER -->
 <header>
   <div class="header-inner">
     <div class="logo">Property<span>Pulse</span></div>
     <div class="header-meta">
-      <div id="live-date">—</div>
+      <div>March 24, 2026</div>
       <div>Fortune · Freddie Mac PMMS · Fannie Mae ESR · HousingWire / MBA</div>
     </div>
-    <button class="refresh-btn" onclick="init()">⟳ Refresh Data</button>
+    <div class="auto-badge">⟳ Auto-updated daily</div>
   </div>
 </header>
 
-<!-- TICKER -->
-<div class="ticker-wrap">
-  <div class="ticker">
-    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.22%</span><span class="chup">▲ Mar 19</span></div>
-    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.54%</span><span class="chup">▲ Mar 19</span></div>
+<div class="ticker-wrap"><div class="ticker">
+    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.67%</span><span class="chup">▲ March 19, 2026</span></div>
+    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.83%</span><span class="chup">▲ Weekly</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y CONV</span><span>6.356%</span><span class="chup">▲+15bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 15Y CONV</span><span>5.707%</span><span class="chup">▲+20bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y JUMBO</span><span>6.597%</span><span class="chup">▲+15bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y FHA</span><span>6.164%</span><span class="chup">▲+15bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y VA</span><span>5.999%</span><span class="chup">▲+17bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y USDA</span><span>6.033%</span><span class="chup">▲+6bps WoW</span></div>
     <div class="ticker-item"><span class="lb">FED RATE</span><span>3.50–3.75%</span><span style="color:#ffd88a">HOLD</span></div>
     <div class="ticker-item"><span class="lb">MBA APPS</span><span>−10.9%</span><span class="chdn">▼ WoW Mar 13</span></div>
     <div class="ticker-item"><span class="lb">REFI APPS</span><span>−27%</span><span class="chdn">▼ Conv WoW</span></div>
     <div class="ticker-item"><span class="lb">FM Q2 FCST</span><span>5.9%</span><span class="chdn">▼ Projected</span></div>
     <div class="ticker-item"><span class="lb">1YR AGO 30Y</span><span>6.67%</span><span class="chdn">▼ −45bps YoY</span></div>
-    <!-- duplicate for seamless loop -->
-    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.22%</span><span class="chup">▲ Mar 19</span></div>
-    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.54%</span><span class="chup">▲ Mar 19</span></div>
+    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.67%</span><span class="chup">▲ March 19, 2026</span></div>
+    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.83%</span><span class="chup">▲ Weekly</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y CONV</span><span>6.356%</span><span class="chup">▲+15bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 15Y CONV</span><span>5.707%</span><span class="chup">▲+20bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y JUMBO</span><span>6.597%</span><span class="chup">▲+15bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y FHA</span><span>6.164%</span><span class="chup">▲+15bps WoW</span></div>
     <div class="ticker-item"><span class="lb">OB 30Y VA</span><span>5.999%</span><span class="chup">▲+17bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y USDA</span><span>6.033%</span><span class="chup">▲+6bps WoW</span></div>
     <div class="ticker-item"><span class="lb">FED RATE</span><span>3.50–3.75%</span><span style="color:#ffd88a">HOLD</span></div>
     <div class="ticker-item"><span class="lb">MBA APPS</span><span>−10.9%</span><span class="chdn">▼ WoW Mar 13</span></div>
     <div class="ticker-item"><span class="lb">REFI APPS</span><span>−27%</span><span class="chdn">▼ Conv WoW</span></div>
     <div class="ticker-item"><span class="lb">FM Q2 FCST</span><span>5.9%</span><span class="chdn">▼ Projected</span></div>
     <div class="ticker-item"><span class="lb">1YR AGO 30Y</span><span>6.67%</span><span class="chdn">▼ −45bps YoY</span></div>
-  </div>
-</div>
+</div></div>
 
 <main>
-
-  <!-- FED BANNER -->
   <div class="fed-note">
     <div class="fed-icon">🏦</div>
     <div>
       <h4>Federal Reserve — March 17–18, 2026 FOMC Decision</h4>
-      <p>Rate held at <strong>3.50–3.75%</strong>. Next meeting: <strong>April 28–29, 2026</strong>. MBA apps fell <strong>10.9% WoW</strong> (week ending Mar 13) as the 30-year rate hit <strong>6.30%</strong> — highest since Dec 2025. Rising Treasury yields + Middle East conflict elevating oil prices. Joel Kan (MBA): <em>"Risk of a broader inflationary shock."</em> Conventional refi apps down <strong>27%</strong> over the week.</p>
+      <p>Rate held at <strong>3.50–3.75%</strong>. Next meeting: <strong>April 28–29, 2026</strong>. MBA apps fell <strong>10.9% WoW</strong> (week ending Mar 13) as the 30-year hit <strong>6.30%</strong> — highest since Dec 2025. Rising Treasury yields + Middle East conflict elevating oil prices. Joel Kan (MBA): <em>"Risk of a broader inflationary shock."</em> Conventional refi apps down <strong>27%</strong>.</p>
     </div>
   </div>
 
-  <!-- KEY STAT TILES -->
-  <div class="section-label">Key Market Indicators · March 2026</div>
+  <div class="section-label">Key Market Indicators · March 24, 2026</div>
   <div class="stat-tiles">
     <div class="stat-tile">
       <div class="st-label">PMMS 30Y FRM</div>
-      <div class="st-val">6.22%</div>
-      <div class="st-sub">Freddie Mac · Mar 19, 2026</div>
+      <div class="st-val">6.67%</div>
+      <div class="st-sub">Freddie Mac · March 19, 2026</div>
       <div class="st-chg up">▲ from 6.11% prev week</div>
     </div>
     <div class="stat-tile">
       <div class="st-label">PMMS 15Y FRM</div>
-      <div class="st-val">5.54%</div>
-      <div class="st-sub">Freddie Mac · Mar 19, 2026</div>
+      <div class="st-val">5.83%</div>
+      <div class="st-sub">Freddie Mac · March 19, 2026</div>
       <div class="st-chg up">▲ from 5.50% prev week</div>
     </div>
     <div class="stat-tile">
@@ -246,353 +174,226 @@
     </div>
   </div>
 
-  <!-- OPTIMAL BLUE RATE CARDS -->
   <div class="section-label">Daily Rate Locks · Optimal Blue via Fortune · March 24, 2026</div>
   <div class="rate-grid" id="rate-grid"></div>
 
-  <!-- RATE TABLE -->
-  <div class="section-label">Full Rate Comparison · Week Over Week · Optimal Blue / Fortune</div>
+  <div class="section-label">Full Rate Comparison · Week Over Week</div>
   <div class="table-wrap">
     <div class="panel-header">
       <h3>Mortgage Rate Table</h3>
-      <span class="badge badge-red">Optimal Blue · Mar 24</span>
+      <span class="badge badge-red">Optimal Blue · March 24, 2026</span>
     </div>
     <table>
-      <thead>
-        <tr>
-          <th>Loan Type</th>
-          <th>Today's Rate</th>
-          <th>Week Prior</th>
-          <th>WoW Δ bps</th>
-          <th>Day-over-Day Δ</th>
-          <th>Trend</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Loan Type</th><th>Today's Rate</th><th>Week Prior</th><th>WoW Δ bps</th><th>Day-over-Day Δ</th><th>Trend</th></tr></thead>
       <tbody id="rate-tbody"></tbody>
     </table>
-    <div class="status-bar">
-      <div class="status-dot"></div>
-      <span>Source: Optimal Blue via Fortune.com · Based on March 23, 2026 lock data · fortune.com/section/real-estate</span>
-    </div>
+    <div class="status-bar"><div class="status-dot"></div><span>Optimal Blue via Fortune.com · fortune.com/section/real-estate · Updated Mar 24, 2026 05:46 PM UTC</span></div>
   </div>
 
-  <!-- FREDDIE MAC PMMS -->
-  <div class="section-label">Freddie Mac Primary Mortgage Market Survey (PMMS) · freddiemac.com/pmms</div>
+  <div class="section-label">Freddie Mac PMMS · freddiemac.com/pmms</div>
   <div class="panel" style="margin-bottom:2rem;">
     <div class="panel-header">
       <h3>PMMS Weekly Survey vs Optimal Blue Daily Rate</h3>
       <span class="badge badge-green">Freddie Mac PMMS</span>
     </div>
     <div class="pmms-strip">
-      <div class="pmms-cell">
-        <div class="pmms-lbl">PMMS 30Y (Mar 19)</div>
-        <div class="pmms-val">6.22%</div>
-        <div class="pmms-sub">Latest weekly avg · 20% down · excellent credit</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">OB 30Y Conv (Mar 24)</div>
-        <div class="pmms-val">6.356%</div>
-        <div class="pmms-sub">Daily lock data · all borrower profiles</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">PMMS 30Y (Mar 12)</div>
-        <div class="pmms-val">6.11%</div>
-        <div class="pmms-sub">Two weeks prior</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">PMMS 30Y (Mar 5)</div>
-        <div class="pmms-val">6.00%</div>
-        <div class="pmms-sub">3-year low region · held steady</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">PMMS 15Y (Mar 19)</div>
-        <div class="pmms-val">5.54%</div>
-        <div class="pmms-sub">Up from 5.50% prev week</div>
-      </div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Latest)</div><div class="pmms-val">6.67%</div><div class="pmms-sub">March 19, 2026 · 20% down · excellent credit</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">OB 30Y Conv (Today)</div><div class="pmms-val">6.356%</div><div class="pmms-sub">Daily lock data · all borrower profiles</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Mar 12)</div><div class="pmms-val">6.11%</div><div class="pmms-sub">Two weeks prior</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Mar 5)</div><div class="pmms-val">6.00%</div><div class="pmms-sub">3-year low region</div></div>
+      <div class="pmms-cell"><div class="pmms-lbl">PMMS 15Y (Latest)</div><div class="pmms-val">5.83%</div><div class="pmms-sub">March 19, 2026</div></div>
     </div>
-    <div style="padding:0.85rem 1.1rem;">
-      <p style="font-size:0.73rem;line-height:1.7;color:var(--muted);">Sam Khater, Freddie Mac Chief Economist (March 19, 2026): <em style="color:var(--ink);">"The 30-year fixed-rate mortgage edged up this week to 6.22% but remains nearly half a percentage point lower than the same time last year. Potential homebuyers are poised for a more affordable spring homebuying season with the market experiencing improvements in purchase applications and pending home sales."</em></p>
-      <p style="font-size:0.65rem;line-height:1.6;color:var(--muted);margin-top:0.5rem;">Note: PMMS measures weekly survey averages from loan applications (20% down, excellent credit, conforming). Optimal Blue reflects daily rate locks across all borrower profiles. The gap between the two reflects borrower mix and timing differences.</p>
+    <div style="padding:.85rem 1.1rem;">
+      <p style="font-size:.73rem;line-height:1.7;color:var(--muted);">Sam Khater, Freddie Mac Chief Economist: <em style="color:var(--ink);">"The 30-year fixed-rate mortgage edged up to 6.67% but remains nearly half a percentage point lower than the same time last year. Potential homebuyers are poised for a more affordable spring homebuying season."</em></p>
+      <p style="font-size:.65rem;line-height:1.6;color:var(--muted);margin-top:.5rem;">PMMS = weekly survey averages (20% down, excellent credit, conforming). Optimal Blue = daily rate locks across all borrower profiles.</p>
     </div>
-    <div class="status-bar">
-      <div class="status-dot"></div>
-      <span>Source: Freddie Mac Primary Mortgage Market Survey · freddiemac.com/pmms · Released weekly Thursdays at 12pm ET</span>
-    </div>
+    <div class="status-bar"><div class="status-dot"></div><span>Freddie Mac PMMS · freddiemac.com/pmms · Released weekly Thursdays 12pm ET · Updated Mar 24, 2026 05:46 PM UTC</span></div>
   </div>
 
-  <!-- MBA APPLICATIONS + NEWS -->
   <div class="two-col">
-
     <div>
-      <div class="section-label">MBA Application Activity · Recent Weeks · HousingWire / MBA</div>
+      <div class="section-label">MBA Application Activity · HousingWire / MBA</div>
       <div class="panel">
-        <div class="panel-header">
-          <h3>Mortgage Purchase Applications Index</h3>
-          <span class="badge badge-red">MBA via HousingWire</span>
-        </div>
+        <div class="panel-header"><h3>Mortgage Purchase Applications Index</h3><span class="badge badge-red">MBA via HousingWire</span></div>
         <div class="mba-section">
           <div class="chart-label">Total Applications — Week-over-Week Change</div>
-          <div class="bar-row">
-            <div class="bar-week">Mar 13</div>
-            <div class="bar-track"><div class="bar-inner" style="width:12%;background:var(--down);"><span>−10.9%</span></div></div>
-            <div class="bar-tag" style="color:var(--down);">↓ Sharp drop</div>
-          </div>
-          <div class="bar-row">
-            <div class="bar-week">Mar 6</div>
-            <div class="bar-track"><div class="bar-inner" style="width:38%;background:var(--up);"><span>+3.2%</span></div></div>
-            <div class="bar-tag" style="color:var(--up);">↑ Rising</div>
-          </div>
-          <div class="bar-row">
-            <div class="bar-week">Feb 27</div>
-            <div class="bar-track"><div class="bar-inner" style="width:82%;background:var(--up);"><span>+11.0%</span></div></div>
-            <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
-          </div>
+              <div class="bar-row">
+      <div class="bar-week">Mar 13</div>
+      <div class="bar-track"><div class="bar-inner" style="width:91%;background:var(--down);"><span>-10.9%</span></div></div>
+      <div class="bar-tag" style="color:var(--down);">↓ Sharp drop</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-week">Mar 6</div>
+      <div class="bar-track"><div class="bar-inner" style="width:27%;background:var(--up);"><span>+3.2%</span></div></div>
+      <div class="bar-tag" style="color:var(--up);">↑ Rising</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-week">Feb 27</div>
+      <div class="bar-track"><div class="bar-inner" style="width:92%;background:var(--up);"><span>+11.0%</span></div></div>
+      <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
+    </div>
           <div class="divider"></div>
           <div class="chart-label">Purchase Index Only — Week-over-Week Change</div>
-          <div class="bar-row">
-            <div class="bar-week">Mar 13</div>
-            <div class="bar-track"><div class="bar-inner" style="width:28%;background:var(--up);"><span>+0.9%</span></div></div>
-            <div class="bar-tag" style="color:var(--up);">↑ Resilient</div>
-          </div>
-          <div class="bar-row">
-            <div class="bar-week">Mar 6</div>
-            <div class="bar-track"><div class="bar-inner" style="width:82%;background:var(--up);"><span>+7.8%</span></div></div>
-            <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
-          </div>
-          <div class="bar-row">
-            <div class="bar-week">Feb 27</div>
-            <div class="bar-track"><div class="bar-inner" style="width:65%;background:var(--up);"><span>+6.1%</span></div></div>
-            <div class="bar-tag" style="color:var(--up);">↑ Good</div>
-          </div>
+              <div class="bar-row">
+      <div class="bar-week">Mar 13</div>
+      <div class="bar-track"><div class="bar-inner" style="width:8%;background:var(--up);"><span>+0.9%</span></div></div>
+      <div class="bar-tag" style="color:var(--up);">↑ Resilient</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-week">Mar 6</div>
+      <div class="bar-track"><div class="bar-inner" style="width:65%;background:var(--up);"><span>+7.8%</span></div></div>
+      <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-week">Feb 27</div>
+      <div class="bar-track"><div class="bar-inner" style="width:51%;background:var(--up);"><span>+6.1%</span></div></div>
+      <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
+    </div>
           <div class="divider"></div>
-          <p style="font-size:0.71rem;line-height:1.7;color:var(--muted);">Purchase apps remain <strong style="color:var(--ink);">+11% YoY</strong> (week of Mar 6). Refi share was 57.8% of total apps week of Mar 6, falling sharply as rates rose. Refi apps down <strong style="color:var(--ink);">27%</strong> conventional WoW (Mar 13). New-home purchase apps: <strong style="color:var(--ink);">+0.9% YoY</strong> in Feb (MBA Builder Survey). Estimated new single-family home sales at <strong style="color:var(--ink);">641K annual pace</strong> in Feb.</p>
+          <p style="font-size:.71rem;line-height:1.7;color:var(--muted);">Purchase apps <strong style="color:var(--ink);">+11% YoY</strong> (Mar 6). Refi share 57.8% of total apps (Mar 6). Refi apps down <strong style="color:var(--ink);">27%</strong> conventional WoW (Mar 13). New-home purchase apps <strong style="color:var(--ink);">+0.9% YoY</strong> (Feb). Estimated new SF home sales at <strong style="color:var(--ink);">641K annual pace</strong>.</p>
         </div>
-        <div class="status-bar">
-          <div class="status-dot"></div>
-          <span>Source: MBA Weekly Mortgage Applications Survey via HousingWire · housingwire.com/mortgage-purchase-applications-index</span>
-        </div>
+        <div class="status-bar"><div class="status-dot"></div><span>MBA Weekly Mortgage Applications Survey via HousingWire · housingwire.com/mortgage-purchase-applications-index · Updated Mar 24, 2026 05:46 PM UTC</span></div>
       </div>
     </div>
-
     <div>
       <div class="section-label">Latest Headlines · fortune.com/section/real-estate</div>
       <div class="panel">
-        <div class="panel-header">
-          <h3>Market News</h3>
-          <span class="badge badge-red">Fortune · Mar 24</span>
-        </div>
-        <a class="news-item" href="https://fortune.com/2026/03/24/redfin-ai-impacting-homebuying-high-mortgage-rates-white-collar-jobpocalypse/" target="_blank" rel="noopener">
-          <div class="ni-date">Mar 24, 2026</div>
-          <div class="ni-title">3 in 5 Americans fear AI will push homeownership further out of reach</div>
-          <div class="ni-desc">Redfin survey finds AI job-loss fears compounding the existing affordability crisis.</div>
-        </a>
-        <a class="news-item" href="https://fortune.com/2026/03/22/mark-cuban-buying-home-at-discount-foreclosure-deals-investing-advice-billionaire-real-estate-strategy/" target="_blank" rel="noopener">
-          <div class="ni-date">Mar 22, 2026</div>
-          <div class="ni-title">Mark Cuban bought a $25M mansion sight unseen — got it 50% off</div>
-          <div class="ni-desc">Billionaire strategy: foreclosure discounts as "best guaranteed return on investment."</div>
-        </a>
-        <a class="news-item" href="https://fortune.com/2026/03/22/k-shaped-economy-six-figure-earners-on-thin-ice-housing-costs-lifestyle-creep-job-market-risks/" target="_blank" rel="noopener">
-          <div class="ni-date">Mar 22, 2026</div>
-          <div class="ni-title">K-shaped economy leaves six-figure earners 'on thin ice'</div>
-          <div class="ni-desc">Housing costs, lifestyle creep, and job market risks trap even high earners.</div>
-        </a>
-        <a class="news-item" href="https://fortune.com/2026/03/19/jerome-powell-ai-data-centers-causing-inflation-electricity-bills-affordability/" target="_blank" rel="noopener">
-          <div class="ni-date">Mar 19, 2026</div>
-          <div class="ni-title">Powell: AI data centers are pushing your electricity bills higher</div>
-          <div class="ni-desc">Fed chair links AI infrastructure boom to household inflation via energy demand.</div>
-        </a>
-        <a class="news-item" href="https://fortune.com/2026/03/15/institutional-investors-ban-single-family-home-sales-affordability-trump-senate-low-income-rent/" target="_blank" rel="noopener">
-          <div class="ni-date">Mar 15, 2026</div>
-          <div class="ni-title">Banning institutional home buyers will backfire, experts warn</div>
-          <div class="ni-desc">Policy aimed at affordability could reduce supply and hurt low-income renters.</div>
-        </a>
-        <a class="news-item" href="https://fortune.com/2026/03/14/luxury-real-estate-markets-developer-wait-lists-subscriptions-billionaires/" target="_blank" rel="noopener">
-          <div class="ni-date">Mar 14, 2026</div>
-          <div class="ni-title">The ultra-wealthy don't house hunt anymore — they subscribe</div>
-          <div class="ni-desc">Luxury real estate pivots to developer wait-lists and subscription models.</div>
-        </a>
-        <div class="status-bar">
-          <div class="status-dot"></div>
-          <span>Source: fortune.com/section/real-estate/ · Scraped March 24, 2026</span>
-        </div>
+        <div class="panel-header"><h3>Market News</h3><span class="badge badge-red">Fortune · March 24, 2026</span></div>
+        
+    <a class="news-item" href="https://fortune.com/2026/03/23/us-government-insolvent-fiscal-crisis-fix/?itm_source=parsely-api" target="_blank" rel="noopener">
+      <div class="ni-date">Mar 23, 2026</div>
+      <div class="ni-title">The Treasury just declared the U.S. insolvent. The media missed it</div>
+    </a>
+    <a class="news-item" href="https://fortune.com/2026/03/23/national-debt-budget-chair-warning-burden-article-v/?itm_source=parsely-api" target="_blank" rel="noopener">
+      <div class="ni-date">Mar 23, 2026</div>
+      <div class="ni-title">It took 200 years for national debt to hit $1 trillion. Annual interest alone now exceeds that—a &#x27;crushing legacy we must reverse,&#x27; says budget chair</div>
+    </a>
+        <div class="status-bar"><div class="status-dot"></div><span>fortune.com/section/real-estate/ · Scraped Mar 24, 2026 05:46 PM UTC</span></div>
       </div>
     </div>
-
   </div>
 
-  <!-- FANNIE MAE FORECAST TABLE -->
   <div class="section-label">Fannie Mae ESR Group — March 2026 Housing Forecast · fanniemae.com/data-and-insights/forecast</div>
   <div class="table-wrap">
-    <div class="panel-header">
-      <h3>30-Year Fixed Rate Forecast — Fannie Mae March 2026</h3>
-      <span class="badge badge-gold">Fannie Mae ESR</span>
-    </div>
+    <div class="panel-header"><h3>30-Year Fixed Rate Forecast — Fannie Mae March 2026</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
     <table class="ftable">
-      <thead>
-        <tr>
-          <th>Period</th>
-          <th>Fannie Mae Forecast</th>
-          <th>vs February Forecast</th>
-          <th>Freddie Mac PMMS (Actual)</th>
-          <th>Signal</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Period</th><th>Fannie Mae Forecast</th><th>vs February Forecast</th><th>Freddie Mac PMMS (Actual)</th><th>Signal</th></tr></thead>
       <tbody>
-        <tr>
-          <td class="td-type">Q1 2026 (ending)</td>
-          <td class="fc">6.00%</td>
-          <td class="fc" style="color:var(--gold);">↓ was 6.10%</td>
-          <td class="fc">6.00%–6.22% observed</td>
-          <td><span class="fc-tag fc-tag-neutral">Near floor</span></td>
-        </tr>
-        <tr>
-          <td class="td-type">Q2 2026</td>
-          <td class="fc fc-good">5.90%</td>
-          <td class="fc fc-good">↓ more bullish</td>
-          <td class="fc fc-neu">—</td>
-          <td><span class="fc-tag fc-tag-green">Sub-6% approaching</span></td>
-        </tr>
-        <tr>
-          <td class="td-type">Q3 2026</td>
-          <td class="fc fc-good">5.80%</td>
-          <td class="fc fc-good">↓ more bullish</td>
-          <td class="fc fc-neu">—</td>
-          <td><span class="fc-tag fc-tag-green">Gradual easing</span></td>
-        </tr>
-        <tr>
-          <td class="td-type">Q4 2026</td>
-          <td class="fc fc-good">5.70%</td>
-          <td class="fc fc-good">↓ more bullish</td>
-          <td class="fc fc-neu">—</td>
-          <td><span class="fc-tag fc-tag-green">Lowest since 2022</span></td>
-        </tr>
-        <tr>
-          <td class="td-type">Full Year 2027</td>
-          <td class="fc fc-good">5.60%–5.70%</td>
-          <td class="fc fc-good">↓ improved</td>
-          <td class="fc fc-neu">—</td>
-          <td><span class="fc-tag fc-tag-green">Continued easing</span></td>
-        </tr>
-      </tbody>
+    <tr>
+      <td class="td-type">Q1 2026 (ending)</td>
+      <td class="fc fc-neu">6.00%</td>
+      <td class="fc fc-neu">↓ was 6.10%</td>
+      <td class="fc fc-neu">6.00%–6.22% observed</td>
+      <td><span class="fc-tag fc-tag-neutral">Near floor</span></td>
+    </tr>
+    <tr>
+      <td class="td-type">Q2 2026</td>
+      <td class="fc fc-good">5.90%</td>
+      <td class="fc fc-good">↓ more bullish</td>
+      <td class="fc fc-neu">—</td>
+      <td><span class="fc-tag fc-tag-green">Sub-6% approaching</span></td>
+    </tr>
+    <tr>
+      <td class="td-type">Q3 2026</td>
+      <td class="fc fc-good">5.80%</td>
+      <td class="fc fc-good">↓ more bullish</td>
+      <td class="fc fc-neu">—</td>
+      <td><span class="fc-tag fc-tag-green">Gradual easing</span></td>
+    </tr>
+    <tr>
+      <td class="td-type">Q4 2026</td>
+      <td class="fc fc-good">5.70%</td>
+      <td class="fc fc-good">↓ more bullish</td>
+      <td class="fc fc-neu">—</td>
+      <td><span class="fc-tag fc-tag-green">Lowest since 2022</span></td>
+    </tr>
+    <tr>
+      <td class="td-type">Full Year 2027</td>
+      <td class="fc fc-good">5.60–5.70%</td>
+      <td class="fc fc-good">↓ improved</td>
+      <td class="fc fc-neu">—</td>
+      <td><span class="fc-tag fc-tag-green">Continued easing</span></td>
+    </tr></tbody>
     </table>
-    <div style="padding:0.85rem 1.1rem;">
-      <p style="font-size:0.72rem;line-height:1.7;color:var(--muted);">Fannie Mae's March forecast is more optimistic than February across all periods. The revision reflects slower projected GDP growth and a lower 10-year Treasury yield forecast — weaker economic expectations translate into lower borrowing costs. Lower rates aid affordability, but fewer single-family starts (−6.2% YoY forecast) limit inventory, keeping prices elevated.</p>
+    <div style="padding:.85rem 1.1rem;">
+      <p style="font-size:.72rem;line-height:1.7;color:var(--muted);">March forecast more optimistic than February across all periods — driven by slower projected GDP growth and a lower 10-year Treasury yield. Fewer single-family starts (−6.2% YoY) limit inventory, keeping prices elevated despite lower rates.</p>
     </div>
-    <div class="status-bar">
-      <div class="status-dot"></div>
-      <span>Source: Fannie Mae Economic &amp; Strategic Research (ESR) Group · March 2026 Housing Forecast · fanniemae.com/data-and-insights/forecast</span>
-    </div>
+    <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR Group · March 2026 Housing Forecast · fanniemae.com/data-and-insights/forecast · Updated Mar 24, 2026 05:46 PM UTC</span></div>
   </div>
 
-  <!-- FANNIE MAE OUTLOOK CARDS -->
   <div class="section-label">Fannie Mae Housing Market Outlook · March 2026</div>
   <div class="three-col">
-
     <div class="outlook-card">
-      <div class="panel-header">
-        <h3>Construction Outlook</h3>
-        <span class="badge badge-gold">Fannie Mae</span>
-      </div>
+      <div class="panel-header"><h3>Construction Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
       <div class="oc-body">
         <div class="oc-val">−6.2%</div>
         <div class="oc-sub">Single-family starts YoY 2026</div>
-        <div class="oc-text">Starts revised down vs Feb forecast for Q1–Q3. Q4 2026 and all of 2027 revised <strong>higher</strong> — 2027 now projected +5.1% YoY vs +2.4% prior estimate. Total annual starts hold near <strong>1.3M</strong>, close to 2025 level. High rates, lot constraints, and economic uncertainty remain top concerns for builders.</div>
+        <div class="oc-text">Starts revised down vs Feb for Q1–Q3. Q4 2026 and 2027 revised <strong>higher</strong> — 2027 now +5.1% YoY vs +2.4% prior. Total annual starts ~<strong>1.3M</strong>. High rates, lot constraints, and uncertainty remain top builder concerns.</div>
       </div>
       <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae March 2026 Housing Forecast</span></div>
     </div>
-
     <div class="outlook-card">
-      <div class="panel-header">
-        <h3>Home Sales Outlook</h3>
-        <span class="badge badge-gold">Fannie Mae</span>
-      </div>
+      <div class="panel-header"><h3>Home Sales Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
       <div class="oc-body">
         <div class="oc-val">~5.5M</div>
         <div class="oc-sub">Total home sales projected 2026</div>
-        <div class="oc-text">Meaningful rise expected vs 2025. Existing-home sales already up <strong>+1.7% in February</strong>. Spring season showing improving purchase applications and pending home sales vs last year. Both new and existing segments contributing to growth. Rates ~45bps below year-ago support buyer engagement.</div>
+        <div class="oc-text">Meaningful rise expected vs 2025. Existing-home sales <strong>+1.7% in February</strong>. Spring season showing improving purchase apps and pending sales. Rates ~45bps below year-ago support buyer engagement.</div>
       </div>
       <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR · Dec 2025 / March 2026 Forecasts</span></div>
     </div>
-
     <div class="outlook-card">
-      <div class="panel-header">
-        <h3>Risk Factors</h3>
-        <span class="badge badge-gold">Fannie Mae ESR</span>
-      </div>
-      <div class="oc-body" style="padding-top:0.9rem;">
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Slower GDP growth (revised down March vs Feb) — weaker economy supports rate declines but signals demand risk</div>
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> 10-year Treasury yield revised lower — aligns with rate forecast but reflects broader uncertainty</div>
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Limited inventory despite lower rates — prices stay elevated, affordability constrained for first-time buyers</div>
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Middle East conflict + oil prices pushing Treasury yields and rates up near-term</div>
-        <div class="risk-item"><span class="risk-dn">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers in measurably better position than 2025</div>
+      <div class="panel-header"><h3>Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
+      <div class="oc-body" style="padding-top:.9rem;">
+        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Slower GDP growth — weaker economy supports rate declines but signals demand risk</div>
+        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Limited inventory — prices elevated, affordability constrained for first-time buyers</div>
+        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Middle East conflict + oil pushing Treasury yields higher near-term</div>
+        <div class="risk-item"><span class="risk-dn">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers better positioned than 2025</div>
       </div>
       <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR Group · March 2026 Economic Forecast</span></div>
     </div>
-
   </div>
-
 </main>
 
 <footer>
-  <strong>PropertyPulse</strong> — Real Estate Market Tracker &nbsp;|&nbsp;
-  Data sources: Fortune.com (scraped March 24, 2026) &nbsp;·&nbsp;
-  Optimal Blue daily rate lock data via Fortune &nbsp;·&nbsp;
-  Freddie Mac Primary Mortgage Market Survey · freddiemac.com/pmms &nbsp;·&nbsp;
-  Fannie Mae ESR Group Housing Forecast · fanniemae.com/data-and-insights/forecast &nbsp;·&nbsp;
-  MBA Weekly Mortgage Applications Survey via HousingWire · housingwire.com/mortgage-purchase-applications-index &nbsp;·&nbsp;
-  HousingWire direct pages returned 403 paywall — data sourced via MBA releases. &nbsp;|&nbsp;
-  Not financial advice. &nbsp;|&nbsp; Last refreshed: <span id="footer-ts">—</span>
+  <strong>PropertyPulse</strong> · Auto-updated daily via GitHub Actions &nbsp;|&nbsp;
+  Fortune.com · Optimal Blue · Freddie Mac PMMS (freddiemac.com/pmms) · Fannie Mae ESR (fanniemae.com/data-and-insights/forecast) · MBA/HousingWire (housingwire.com/mortgage-purchase-applications-index) &nbsp;|&nbsp;
+  Not financial advice. &nbsp;|&nbsp; Last updated: Mar 24, 2026 05:46 PM UTC
 </footer>
 
 <script>
-const RATES = [
-  { type: "30-Year Conventional", lb: "30Y CONV",  rate: 6.356, prev: 6.214, bps: 15, dod: "+11bps" },
-  { type: "15-Year Conventional", lb: "15Y CONV",  rate: 5.707, prev: 5.507, bps: 20, dod: "+6bps"  },
-  { type: "30-Year Jumbo",        lb: "30Y JUMBO", rate: 6.597, prev: 6.454, bps: 15, dod: "+13bps" },
-  { type: "30-Year FHA",          lb: "30Y FHA",   rate: 6.164, prev: 6.014, bps: 15, dod: "+10bps" },
-  { type: "30-Year VA",           lb: "30Y VA",    rate: 5.999, prev: 5.830, bps: 17, dod: "+9bps"  },
-  { type: "30-Year USDA",         lb: "30Y USDA",  rate: 6.033, prev: 5.968, bps:  6, dod: "+15bps" },
-];
-
+const RATES = [{"type": "30-Year Conventional", "lb": "30Y CONV", "rate": 6.356, "prev": 6.214, "bps": 15, "dod": "+11bps"}, {"type": "15-Year Conventional", "lb": "15Y CONV", "rate": 5.707, "prev": 5.507, "bps": 20, "dod": "+6bps"}, {"type": "30-Year Jumbo", "lb": "30Y JUMBO", "rate": 6.597, "prev": 6.454, "bps": 15, "dod": "+13bps"}, {"type": "30-Year FHA", "lb": "30Y FHA", "rate": 6.164, "prev": 6.014, "bps": 15, "dod": "+10bps"}, {"type": "30-Year VA", "lb": "30Y VA", "rate": 5.999, "prev": 5.83, "bps": 17, "dod": "+9bps"}, {"type": "30-Year USDA", "lb": "30Y USDA", "rate": 6.033, "prev": 5.968, "bps": 6, "dod": "+15bps"}];
+function renderCard(r) {
+  const u = r.bps >= 0;
+  const pct = Math.min(100, Math.round(r.rate/8*100));
+  const dir = u ? 'up' : 'dn';
+  const arrow = u ? '▲' : '▼';
+  return '<div class="rate-card">'
+    + '<div class="rc-label">' + r.lb + '</div>'
+    + '<div class="rc-value">' + r.rate.toFixed(3) + '%</div>'
+    + '<div class="rc-chg ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + 'bps WoW</div>'
+    + '<div class="rc-prev">Prev wk: ' + r.prev.toFixed(3) + '%</div>'
+    + '<div class="rc-bar" style="width:' + pct + '%"></div>'
+    + '</div>';
+}
+function renderRow(r) {
+  const u = r.bps >= 0;
+  const bp = Math.min(100, Math.round(Math.abs(r.bps)/25*100));
+  const dir = u ? 'up' : 'dn';
+  const arrow = u ? '▲' : '▼';
+  const col = u ? 'var(--down)' : 'var(--up)';
+  return '<tr>'
+    + '<td class="td-type">' + r.type + '</td>'
+    + '<td class="td-rate">' + r.rate.toFixed(3) + '%</td>'
+    + '<td class="td-prev">' + r.prev.toFixed(3) + '%</td>'
+    + '<td class="td-bps ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + '</td>'
+    + '<td class="td-prev" style="color:' + col + ';">' + r.dod + '</td>'
+    + '<td><div class="bar-wrap"><div class="bar-fill" style="width:' + bp + '%;background:' + col + '"></div></div></td>'
+    + '</tr>';
+}
 function init() {
-  const now = new Date();
-  document.getElementById('live-date').textContent =
-    now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  document.getElementById('footer-ts').textContent =
-    now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-  renderCards();
-  renderTable();
+  document.getElementById('rate-grid').innerHTML = RATES.map(renderCard).join('');
+  document.getElementById('rate-tbody').innerHTML = RATES.map(renderRow).join('');
 }
-
-function renderCards() {
-  document.getElementById('rate-grid').innerHTML = RATES.map(r => {
-    const u = r.bps >= 0;
-    const pct = Math.min(100, Math.round((r.rate / 8) * 100));
-    return `<div class="rate-card">
-      <div class="rc-label">${r.lb}</div>
-      <div class="rc-value">${r.rate.toFixed(3)}%</div>
-      <div class="rc-chg ${u ? 'up' : 'dn'}">${u ? '▲' : '▼'} ${Math.abs(r.bps)}bps WoW</div>
-      <div class="rc-prev">Prev wk: ${r.prev.toFixed(3)}%</div>
-      <div class="rc-bar" style="width:${pct}%"></div>
-    </div>`;
-  }).join('');
-}
-
-function renderTable() {
-  document.getElementById('rate-tbody').innerHTML = RATES.map(r => {
-    const u = r.bps >= 0;
-    const bp = Math.min(100, Math.round(Math.abs(r.bps) / 25 * 100));
-    return `<tr>
-      <td class="td-type">${r.type}</td>
-      <td class="td-rate">${r.rate.toFixed(3)}%</td>
-      <td class="td-prev">${r.prev.toFixed(3)}%</td>
-      <td class="td-bps ${u ? 'up' : 'dn'}">${u ? '▲' : '▼'} ${Math.abs(r.bps)}</td>
-      <td class="td-prev" style="color:${u ? 'var(--down)' : 'var(--up)'}">${r.dod}</td>
-      <td><div class="bar-wrap"><div class="bar-fill" style="width:${bp}%;background:${u ? 'var(--down)' : 'var(--up)'}"></div></div></td>
-    </tr>`;
-  }).join('');
-}
-
 init();
 </script>
 </body>
