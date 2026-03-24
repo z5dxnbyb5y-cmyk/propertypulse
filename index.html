@@ -3,262 +3,343 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PropertyPulse — Real Estate Market Tracker</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>Newzip Market Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{--ink:#0d0d0d;--paper:#f4f0e8;--paper2:#ede8da;--accent:#c84b2f;--up:#2a6e4e;--down:#c84b2f;--gold:#d4943a;--muted:#7a7163;--border:#c8bfa8;--card:#faf7f0}
+  :root{
+    --nz-blue:#4C6DE1;
+    --nz-blue-light:#EEF1FC;
+    --nz-blue-mid:#7B93E8;
+    --nz-teal:#005E53;
+    --nz-teal-light:#E6F2F0;
+    --nz-teal-mid:#3D8C84;
+    --ink:#1a1a2e;
+    --paper:#F8F9FC;
+    --paper2:#EFF1F8;
+    --card:#FFFFFF;
+    --border:#E2E5F0;
+    --muted:#6B7280;
+    --nz-red:#D64045;
+    --nz-red-light:#FDF0F0;
+    --gold:#D4943A;
+  }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Syne',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px}
+  body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px}
   a{color:inherit;text-decoration:none}
-  header{background:var(--ink);color:var(--paper);padding:0 1.5rem;border-bottom:3px solid var(--accent)}
-  .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 0}
-  .logo{font-family:'DM Serif Display',serif;font-size:1.6rem;letter-spacing:-.02em}.logo span{color:var(--accent)}
-  .header-meta{font-family:'DM Mono',monospace;font-size:.62rem;color:#a09880;text-align:right;line-height:1.7}
-  .auto-badge{background:var(--up);color:white;padding:.3rem .8rem;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.05em;white-space:nowrap}
-  .ticker-wrap{background:var(--accent);overflow:hidden;padding:.4rem 0}
-  .ticker{display:flex;gap:2.75rem;animation:scroll 45s linear infinite;width:max-content}
-  .ticker-item{font-family:'DM Mono',monospace;font-size:.65rem;color:white;white-space:nowrap;display:flex;align-items:center;gap:.3rem}
-  .ticker-item .lb{opacity:.72}.chup{color:#a8ffc8}.chdn{color:#ffa8a8}
+
+  /* HEADER */
+  header{background:white;border-bottom:1px solid var(--border);padding:0 1.5rem;box-shadow:0 1px 4px rgba(76,109,225,.08)}
+  .hi{max-width:1280px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 0}
+  .logo-wrap img{height:28px;display:block}
+  .header-title{font-size:.78rem;font-weight:600;color:var(--nz-blue);letter-spacing:.04em;text-transform:uppercase}
+  .hmeta{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;line-height:1.7}
+
+  /* TICKER */
+  .ticker-wrap{background:var(--nz-blue);overflow:hidden;padding:.38rem 0}
+  .ticker{display:flex;gap:3rem;animation:scroll 55s linear infinite;width:max-content}
+  .ticker-item{font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.9);white-space:nowrap;display:flex;align-items:center;gap:.3rem}
+  .ticker-item .lb{opacity:.65}.chup{color:#a8ffc8}.chdn{color:#ffa8a8}
   @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-  main{max-width:1200px;margin:0 auto;padding:1.75rem 1.5rem}
-  .section-label{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}
-  .section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+  /* LAYOUT */
+  main{max-width:1280px;margin:0 auto;padding:1.75rem 1.5rem}
+  .slbl{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}
+  .slbl::after{content:'';flex:1;height:1px;background:var(--border)}
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}
   .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-bottom:2rem}
   @media(max-width:860px){.two-col,.three-col{grid-template-columns:1fr}}
-  .fed-note{background:var(--ink);color:var(--paper);padding:1.25rem 1.5rem;margin-bottom:2rem;border-left:4px solid var(--gold);display:flex;gap:1.25rem;align-items:flex-start}
-  .fed-icon{font-size:1.8rem;flex-shrink:0;opacity:.7}
-  .fed-note h4{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:.35rem}
-  .fed-note p{font-size:.76rem;line-height:1.65;color:#ccc}.fed-note strong{color:white}
-  .stat-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:2rem}
+
+  /* ALERT BANNER */
+  .fed-note{background:var(--nz-blue);color:white;padding:1rem 1.5rem;margin-bottom:2rem;border-radius:8px;display:flex;gap:1.25rem;align-items:flex-start}
+  .fed-icon{font-size:1.5rem;flex-shrink:0;opacity:.85}
+  .fed-note h4{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:.3rem}
+  .fed-note p{font-size:.75rem;line-height:1.65;color:rgba(255,255,255,.9)}.fed-note strong{color:white}
+
+  /* STAT TILES */
+  .stat-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
   @media(max-width:700px){.stat-tiles{grid-template-columns:repeat(2,1fr)}}
-  .stat-tile{background:var(--card);padding:1rem 1.1rem}
-  .st-label{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.3rem}
-  .st-val{font-family:'DM Serif Display',serif;font-size:1.7rem;line-height:1;margin-bottom:.2rem}
-  .st-sub{font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)}
-  .st-chg{font-family:'DM Mono',monospace;font-size:.62rem;margin-top:.2rem}
-  .st-chg.up{color:var(--down)}.st-chg.pos{color:var(--up)}
-  .rate-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:2rem}
-  @media(max-width:900px){.rate-grid{grid-template-columns:repeat(3,1fr)}}
-  @media(max-width:500px){.rate-grid{grid-template-columns:repeat(2,1fr)}}
-  .rate-card{background:var(--card);padding:1rem 1.1rem;position:relative;overflow:hidden}
-  .rc-label{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
-  .rc-value{font-family:'DM Serif Display',serif;font-size:1.75rem;line-height:1;margin-bottom:.2rem}
-  .rc-chg{font-family:'DM Mono',monospace;font-size:.6rem}.rc-chg.up{color:var(--down)}.rc-chg.dn{color:var(--up)}
-  .rc-prev{font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);margin-top:.15rem}
-  .rc-bar{position:absolute;bottom:0;left:0;height:3px;background:var(--accent)}
-  .panel{background:var(--card);border:1px solid var(--border)}
-  .panel-header{padding:.85rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--ink);color:var(--paper)}
-  .panel-header h3{font-family:'DM Serif Display',serif;font-size:.95rem;font-weight:400}
-  .badge{font-family:'DM Mono',monospace;font-size:.54rem;padding:.12rem .45rem;text-transform:uppercase;letter-spacing:.06em;color:white}
-  .badge-red{background:var(--accent)}.badge-green{background:var(--up)}.badge-gold{background:var(--gold);color:var(--ink)}
-  .status-bar{display:flex;align-items:center;gap:.45rem;padding:.5rem 1.1rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)}
-  .status-dot{width:5px;height:5px;border-radius:50%;background:var(--up);flex-shrink:0}
-  .table-wrap{background:var(--card);border:1px solid var(--border);margin-bottom:2rem;overflow-x:auto}
+  .stat-tile{background:white;border:1px solid var(--border);border-radius:8px;padding:1.1rem 1.25rem;position:relative;overflow:hidden}
+  .stat-tile::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--nz-blue)}
+  .st-label{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem}
+  .st-val{font-size:1.9rem;font-weight:700;line-height:1;margin-bottom:.2rem;color:var(--ink)}
+  .st-sub{font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted)}
+  .st-chg{font-family:'DM Mono',monospace;font-size:.6rem;margin-top:.25rem}
+  .st-chg.neg{color:var(--nz-red)}.st-chg.pos{color:var(--nz-teal)}
+
+  /* RATE CARDS */
+  .rate-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem}
+  @media(min-width:500px){.rate-grid{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:900px){.rate-grid{grid-template-columns:repeat(6,1fr)}}
+  .rate-card{background:white;border:1px solid var(--border);border-radius:8px;padding:1rem 1.1rem;position:relative;overflow:hidden;transition:box-shadow .2s}
+  .rate-card:hover{box-shadow:0 4px 16px rgba(76,109,225,.12)}
+  .rate-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--nz-teal)}
+  .rc-label{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+  .rc-value{font-size:1.65rem;font-weight:700;line-height:1;margin-bottom:.2rem;color:var(--ink)}
+  .rc-chg{font-family:'DM Mono',monospace;font-size:.58rem}.rc-chg.up{color:var(--nz-red)}.rc-chg.dn{color:var(--nz-teal)}
+  .rc-prev{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:.15rem}
+
+  /* PANELS */
+  .panel{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .ph{padding:.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--paper)}
+  .ph h3{font-size:.88rem;font-weight:600;color:var(--ink)}
+  .badge{font-family:'DM Mono',monospace;font-size:.52rem;padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}
+  .badge-blue{background:var(--nz-blue-light);color:var(--nz-blue)}
+  .badge-teal{background:var(--nz-teal-light);color:var(--nz-teal)}
+  .badge-gold{background:#FDF3E3;color:var(--gold)}
+  .badge-red{background:var(--nz-red-light);color:var(--nz-red)}
+  .sb{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted)}
+  .sd{width:5px;height:5px;border-radius:50%;background:var(--nz-teal);flex-shrink:0}
+
+  /* TABLES */
+  .tbl-wrap{background:white;border:1px solid var(--border);border-radius:8px;margin-bottom:2rem;overflow:hidden}
   table{width:100%;border-collapse:collapse;font-size:.78rem}
-  thead th{font-family:'DM Mono',monospace;font-size:.54rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:.65rem 1.1rem;text-align:left;border-bottom:1px solid var(--border);background:var(--paper);white-space:nowrap}
+  thead th{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:.65rem 1.25rem;text-align:left;border-bottom:1px solid var(--border);background:var(--paper);white-space:nowrap}
   tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
   tbody tr:hover{background:var(--paper2)}tbody tr:last-child{border-bottom:none}
-  tbody td{padding:.7rem 1.1rem;vertical-align:middle}
-  .td-type{font-weight:700}.td-rate{font-family:'DM Serif Display',serif;font-size:1.15rem}
-  .td-prev{font-family:'DM Mono',monospace;font-size:.66rem;color:var(--muted)}
-  .td-bps{font-family:'DM Mono',monospace;font-size:.7rem;font-weight:500}
-  .td-bps.up{color:var(--down)}.td-bps.dn{color:var(--up)}
+  tbody td{padding:.7rem 1.25rem;vertical-align:middle}
+  .td-type{font-weight:600;font-size:.78rem}
+  .td-rate{font-size:1.1rem;font-weight:700;color:var(--ink)}
+  .td-prev{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted)}
+  .td-bps{font-family:'DM Mono',monospace;font-size:.68rem;font-weight:500}
+  .td-bps.up{color:var(--nz-red)}.td-bps.dn{color:var(--nz-teal)}
   .bar-wrap{width:60px;height:4px;background:var(--paper2);border-radius:2px;overflow:hidden}
   .bar-fill{height:100%;border-radius:2px}
+
+  /* PMMS STRIP */
   .pmms-strip{display:flex;gap:1px;background:var(--border)}
-  .pmms-cell{flex:1;background:var(--card);padding:.75rem 1rem}
-  .pmms-lbl{font-family:'DM Mono',monospace;font-size:.54rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
-  .pmms-val{font-family:'DM Serif Display',serif;font-size:1.35rem;line-height:1}
-  .pmms-sub{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:.15rem}
-  .mba-section{padding:1rem 1.1rem}
-  .chart-label{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.65rem}
+  .pmms-cell{flex:1;background:white;padding:.85rem 1rem}
+  .pmms-lbl{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+  .pmms-val{font-size:1.3rem;font-weight:700;line-height:1;color:var(--ink)}
+  .pmms-sub{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}
+
+  /* MBA */
+  .mba-section{padding:1rem 1.25rem}
+  .chart-label{font-family:'DM Mono',monospace;font-size:.54rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.65rem}
   .bar-row{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
-  .bar-week{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);width:52px;flex-shrink:0;text-align:right}
-  .bar-track{flex:1;height:20px;background:var(--paper2);border-radius:2px;overflow:hidden}
-  .bar-inner{height:100%;border-radius:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
-  .bar-inner span{font-family:'DM Mono',monospace;font-size:.56rem;color:white;font-weight:500}
-  .bar-tag{font-family:'DM Mono',monospace;font-size:.54rem;width:80px;flex-shrink:0}
-  .divider{height:1px;background:var(--border);margin:.85rem 0}
-  .news-item{padding:.8rem 1.1rem;border-bottom:1px solid var(--border);display:block;color:var(--ink);transition:background .15s}
+  .bar-week{font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted);width:50px;flex-shrink:0;text-align:right}
+  .bar-track{flex:1;height:20px;background:var(--paper2);border-radius:4px;overflow:hidden}
+  .bar-inner{height:100%;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px}
+  .bar-inner span{font-family:'DM Mono',monospace;font-size:.54rem;color:white;font-weight:500}
+  .bar-tag{font-family:'DM Mono',monospace;font-size:.52rem;width:68px;flex-shrink:0}
+  .mba-link{display:block;padding:.5rem 0;border-bottom:1px solid var(--border)}
+  .mba-link:last-child{border-bottom:none}
+
+  /* NEWS */
+  .news-item{padding:.8rem 1.25rem;border-bottom:1px solid var(--border);display:block;color:var(--ink);transition:background .15s}
   .news-item:hover{background:var(--paper2)}.news-item:last-child{border-bottom:none}
-  .ni-date{font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:.2rem;text-transform:uppercase}
-  .ni-title{font-size:.78rem;font-weight:600;line-height:1.35}
-  .ftable td,.ftable th{padding:.6rem 1rem}
-  .fc{font-family:'DM Mono',monospace;font-size:.7rem}.fc-good{color:var(--up)}.fc-warn{color:var(--gold)}.fc-neu{color:var(--muted)}
-  .fc-tag{font-family:'DM Mono',monospace;font-size:.6rem;padding:.1rem .45rem;border-radius:2px}
-  .fc-tag-green{background:#e8f5ee;color:var(--up)}.fc-tag-amber{background:#fdf3e3;color:var(--gold)}.fc-tag-neutral{background:var(--paper2);color:var(--muted)}
-  .outlook-card{background:var(--card);border:1px solid var(--border)}
-  .oc-body{padding:1rem 1.1rem}
-  .oc-val{font-family:'DM Serif Display',serif;font-size:1.8rem;line-height:1;margin-bottom:.25rem}
-  .oc-sub{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem;letter-spacing:.07em}
-  .oc-text{font-size:.73rem;line-height:1.65;color:var(--muted)}.oc-text strong{color:var(--ink)}
-  .risk-item{font-size:.72rem;line-height:1.65;color:var(--muted);margin-bottom:.4rem}.risk-item:last-child{margin-bottom:0}
-  .risk-up{color:var(--down);font-weight:700}.risk-dn{color:var(--up);font-weight:700}
-  footer{max-width:1200px;margin:0 auto;padding:1.25rem 1.5rem;font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted);border-top:1px solid var(--border);line-height:1.8}
+  .ni-date{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:.2rem;text-transform:uppercase}
+  .ni-title{font-size:.78rem;font-weight:600;line-height:1.35;margin-bottom:.2rem}
+  .ni-desc{font-size:.68rem;color:var(--muted);line-height:1.45}
+
+  /* FORECAST */
+  .ftable td,.ftable th{padding:.65rem 1.25rem}
+  .fc{font-family:'DM Mono',monospace;font-size:.7rem}.fc-good{color:var(--nz-teal);font-weight:600}.fc-neu{color:var(--muted)}
+  .fc-tag{font-family:'DM Mono',monospace;font-size:.58rem;padding:.15rem .5rem;border-radius:4px}
+  .fc-tag-teal{background:var(--nz-teal-light);color:var(--nz-teal)}
+  .fc-tag-neutral{background:var(--paper2);color:var(--muted)}
+
+  /* ECON CARDS */
+  .econ-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border-radius:0 0 8px 8px;overflow:hidden}
+  .econ-cell{background:white;padding:.85rem 1.1rem}
+  .ec-label{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.25rem;letter-spacing:.06em}
+  .ec-val{font-size:1.4rem;font-weight:700;color:var(--ink);line-height:1;margin-bottom:.15rem}
+  .ec-sub{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted)}
+
+  footer{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);line-height:1.8;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .footer-logo img{height:18px;opacity:.5}
 </style>
 </head>
 <body>
+
 <header>
-  <div class="header-inner">
-    <div class="logo">Property<span>Pulse</span></div>
-    <div class="header-meta">
-      <div>March 24, 2026</div>
-      <div>Fortune · Freddie Mac PMMS · Fannie Mae ESR · HousingWire / MBA</div>
+  <div class="hi">
+    <div style="display:flex;align-items:center;gap:1.5rem;">
+      <div class="logo-wrap"><img src="data:image/png;base64,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" alt="Newzip"></div>
+      <div class="header-title">Market Tracker</div>
     </div>
-    <div class="auto-badge">⟳ Auto-updated daily</div>
+    <div class="hmeta">
+      <div>March 24, 2026</div>
+      <div>OBMMI · PMMS · Fannie Mae ESR · MBA · Inman · Fortune</div>
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;">
+      Auto-updated daily<br>Last run: Mar 24, 2026 07:15 PM UTC
+    </div>
   </div>
 </header>
 
-<div class="ticker-wrap"><div class="ticker">
-    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.67%</span><span class="chup">▲ March 19, 2026</span></div>
-    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.83%</span><span class="chup">▲ Weekly</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y CONV</span><span>6.356%</span><span class="chup">▲+15bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 15Y CONV</span><span>5.707%</span><span class="chup">▲+20bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y JUMBO</span><span>6.597%</span><span class="chup">▲+15bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y FHA</span><span>6.164%</span><span class="chup">▲+15bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y VA</span><span>5.999%</span><span class="chup">▲+17bps WoW</span></div>
+<div class="ticker-wrap">
+  <div class="ticker">
+    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.22%</span><span class="chdn">▲ N/A</span></div>
+    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.54%</span><span class="chup">Weekly avg</span></div>
     <div class="ticker-item"><span class="lb">FED RATE</span><span>3.50–3.75%</span><span style="color:#ffd88a">HOLD</span></div>
-    <div class="ticker-item"><span class="lb">MBA APPS</span><span>−10.9%</span><span class="chdn">▼ WoW Mar 13</span></div>
-    <div class="ticker-item"><span class="lb">REFI APPS</span><span>−27%</span><span class="chdn">▼ Conv WoW</span></div>
-    <div class="ticker-item"><span class="lb">FM Q2 FCST</span><span>5.9%</span><span class="chdn">▼ Projected</span></div>
-    <div class="ticker-item"><span class="lb">1YR AGO 30Y</span><span>6.67%</span><span class="chdn">▼ −45bps YoY</span></div>
-    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.67%</span><span class="chup">▲ March 19, 2026</span></div>
-    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.83%</span><span class="chup">▲ Weekly</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y CONV</span><span>6.356%</span><span class="chup">▲+15bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 15Y CONV</span><span>5.707%</span><span class="chup">▲+20bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y JUMBO</span><span>6.597%</span><span class="chup">▲+15bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y FHA</span><span>6.164%</span><span class="chup">▲+15bps WoW</span></div>
-    <div class="ticker-item"><span class="lb">OB 30Y VA</span><span>5.999%</span><span class="chup">▲+17bps WoW</span></div>
+    <div class="ticker-item"><span class="lb">1YR AGO</span><span>6.67%</span><span class="chdn">▼ 45bps YoY</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y CONV</span><span>6.356%</span><span class="chup">▲14bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 15Y CONV</span><span>5.707%</span><span class="chup">▲20bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y JUMBO</span><span>6.597%</span><span class="chup">▲14bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y FHA</span><span>6.164%</span><span class="chup">▲15bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y VA</span><span>5.999%</span><span class="chup">▲17bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y USDA</span><span>6.033%</span><span class="chup">▲6bps</span></div>
+    <div class="ticker-item"><span class="lb">PMMS 30Y</span><span>6.22%</span><span class="chdn">▲ N/A</span></div>
+    <div class="ticker-item"><span class="lb">PMMS 15Y</span><span>5.54%</span><span class="chup">Weekly avg</span></div>
     <div class="ticker-item"><span class="lb">FED RATE</span><span>3.50–3.75%</span><span style="color:#ffd88a">HOLD</span></div>
-    <div class="ticker-item"><span class="lb">MBA APPS</span><span>−10.9%</span><span class="chdn">▼ WoW Mar 13</span></div>
-    <div class="ticker-item"><span class="lb">REFI APPS</span><span>−27%</span><span class="chdn">▼ Conv WoW</span></div>
-    <div class="ticker-item"><span class="lb">FM Q2 FCST</span><span>5.9%</span><span class="chdn">▼ Projected</span></div>
-    <div class="ticker-item"><span class="lb">1YR AGO 30Y</span><span>6.67%</span><span class="chdn">▼ −45bps YoY</span></div>
-</div></div>
+    <div class="ticker-item"><span class="lb">1YR AGO</span><span>6.67%</span><span class="chdn">▼ 45bps YoY</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y CONV</span><span>6.356%</span><span class="chup">▲14bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 15Y CONV</span><span>5.707%</span><span class="chup">▲20bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y JUMBO</span><span>6.597%</span><span class="chup">▲14bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y FHA</span><span>6.164%</span><span class="chup">▲15bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y VA</span><span>5.999%</span><span class="chup">▲17bps</span></div>
+    <div class="ticker-item"><span class="lb">OB 30Y USDA</span><span>6.033%</span><span class="chup">▲6bps</span></div>
+  </div>
+</div>
 
 <main>
+
   <div class="fed-note">
     <div class="fed-icon">🏦</div>
     <div>
-      <h4>Federal Reserve — March 17–18, 2026 FOMC Decision</h4>
-      <p>Rate held at <strong>3.50–3.75%</strong>. Next meeting: <strong>April 28–29, 2026</strong>. MBA apps fell <strong>10.9% WoW</strong> (week ending Mar 13) as the 30-year hit <strong>6.30%</strong> — highest since Dec 2025. Rising Treasury yields + Middle East conflict elevating oil prices. Joel Kan (MBA): <em>"Risk of a broader inflationary shock."</em> Conventional refi apps down <strong>27%</strong>.</p>
+      <h4>Federal Reserve — Rate Held at 3.50–3.75% · Next Meeting April 28–29, 2026</h4>
+      <p>PMMS 30Y at <strong>6.22%</strong> as of N/A — <strong>45bps</strong> below a year ago (6.67%). 10-Year Treasury forecast: <strong>N/A</strong>. Fannie Mae ESR report: <strong>Latest</strong>. OBMMI data as of <strong>N/A</strong>.</p>
     </div>
   </div>
 
-  <div class="section-label">Key Market Indicators · March 24, 2026</div>
+  <div class="slbl">Key Indicators · March 24, 2026</div>
   <div class="stat-tiles">
     <div class="stat-tile">
       <div class="st-label">PMMS 30Y FRM</div>
-      <div class="st-val">6.67%</div>
-      <div class="st-sub">Freddie Mac · March 19, 2026</div>
-      <div class="st-chg up">▲ from 6.11% prev week</div>
+      <div class="st-val">6.22%</div>
+      <div class="st-sub">Freddie Mac · N/A</div>
+      <div class="st-chg neg">▲ from 6.11% prev week</div>
     </div>
     <div class="stat-tile">
       <div class="st-label">PMMS 15Y FRM</div>
-      <div class="st-val">5.83%</div>
-      <div class="st-sub">Freddie Mac · March 19, 2026</div>
-      <div class="st-chg up">▲ from 5.50% prev week</div>
+      <div class="st-val">5.54%</div>
+      <div class="st-sub">Freddie Mac · N/A</div>
+      <div class="st-chg neg">▲ from 5.50% prev week</div>
     </div>
     <div class="stat-tile">
-      <div class="st-label">Year-Over-Year</div>
-      <div class="st-val">−45bps</div>
+      <div class="st-label">YoY Change</div>
+      <div class="st-val">45bps</div>
       <div class="st-sub">30Y was 6.67% a year ago</div>
       <div class="st-chg pos">▼ More affordable YoY</div>
     </div>
     <div class="stat-tile">
-      <div class="st-label">MBA Purchase Index</div>
-      <div class="st-val">+0.9%</div>
-      <div class="st-sub">Purchases WoW · Mar 13</div>
-      <div class="st-chg up">Total apps −10.9% WoW</div>
+      <div class="st-label">HPSI Sentiment</div>
+      <div class="st-val">N/A</div>
+      <div class="st-sub">Fannie Mae HPSI · </div>
+      <div class="st-chg pos">Home Purchase Sentiment Index</div>
     </div>
   </div>
 
-  <div class="section-label">Daily Rate Locks · Optimal Blue via Fortune · March 24, 2026</div>
+  <div class="slbl">OBMMI Daily Rate Locks · Optimal Blue via FRED API · N/A</div>
   <div class="rate-grid" id="rate-grid"></div>
 
-  <div class="section-label">Full Rate Comparison · Week Over Week</div>
-  <div class="table-wrap">
-    <div class="panel-header">
-      <h3>Mortgage Rate Table</h3>
-      <span class="badge badge-red">Optimal Blue · March 24, 2026</span>
-    </div>
+  <div class="slbl">Full OBMMI Rate Comparison</div>
+  <div class="tbl-wrap">
+    <div class="ph"><h3>Optimal Blue Mortgage Market Indices (OBMMI)</h3><span class="badge badge-blue">FRED API · OBMMI</span></div>
     <table>
-      <thead><tr><th>Loan Type</th><th>Today's Rate</th><th>Week Prior</th><th>WoW Δ bps</th><th>Day-over-Day Δ</th><th>Trend</th></tr></thead>
+      <thead><tr><th>Loan Type</th><th>Current Rate</th><th>Prior Period</th><th>Change (bps)</th><th>Trend</th></tr></thead>
       <tbody id="rate-tbody"></tbody>
     </table>
-    <div class="status-bar"><div class="status-dot"></div><span>Optimal Blue via Fortune.com · fortune.com/section/real-estate · Updated Mar 24, 2026 05:46 PM UTC</span></div>
+    <div class="sb"><div class="sd"></div><span>Optimal Blue OBMMI via FRED API · Actual locked rates from ~35% of US mortgage transactions · Updated nightly</span></div>
   </div>
 
-  <div class="section-label">Freddie Mac PMMS · freddiemac.com/pmms</div>
+  <div class="slbl">Freddie Mac PMMS · Via FRED API</div>
   <div class="panel" style="margin-bottom:2rem;">
-    <div class="panel-header">
-      <h3>PMMS Weekly Survey vs Optimal Blue Daily Rate</h3>
-      <span class="badge badge-green">Freddie Mac PMMS</span>
-    </div>
+    <div class="ph"><h3>Primary Mortgage Market Survey — Weekly Rates</h3><span class="badge badge-teal">Freddie Mac · FRED</span></div>
     <div class="pmms-strip">
-      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Latest)</div><div class="pmms-val">6.67%</div><div class="pmms-sub">March 19, 2026 · 20% down · excellent credit</div></div>
-      <div class="pmms-cell"><div class="pmms-lbl">OB 30Y Conv (Today)</div><div class="pmms-val">6.356%</div><div class="pmms-sub">Daily lock data · all borrower profiles</div></div>
-      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Mar 12)</div><div class="pmms-val">6.11%</div><div class="pmms-sub">Two weeks prior</div></div>
-      <div class="pmms-cell"><div class="pmms-lbl">PMMS 30Y (Mar 5)</div><div class="pmms-val">6.00%</div><div class="pmms-sub">3-year low region</div></div>
-      <div class="pmms-cell"><div class="pmms-lbl">PMMS 15Y (Latest)</div><div class="pmms-val">5.83%</div><div class="pmms-sub">March 19, 2026</div></div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">30Y FRM · N/A</div>
+        <div class="pmms-val">6.22%</div>
+        <div class="pmms-sub">Weekly avg · 20% down · excellent credit</div>
+      </div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">15Y FRM · N/A</div>
+        <div class="pmms-val">5.54%</div>
+        <div class="pmms-sub">Weekly survey avg</div>
+      </div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">30Y Prev Week</div>
+        <div class="pmms-val">6.11%</div>
+        <div class="pmms-sub">Prior PMMS reading</div>
+      </div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">30Y One Year Ago</div>
+        <div class="pmms-val">6.67%</div>
+        <div class="pmms-sub">Same week prior year</div>
+      </div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">WoW Change 30Y</div>
+        <div class="pmms-val" style="color:var(--nz-red);">▲11bps</div>
+        <div class="pmms-sub">Basis points week-over-week</div>
+      </div>
     </div>
-    <div style="padding:.85rem 1.1rem;">
-      <p style="font-size:.73rem;line-height:1.7;color:var(--muted);">Sam Khater, Freddie Mac Chief Economist: <em style="color:var(--ink);">"The 30-year fixed-rate mortgage edged up to 6.67% but remains nearly half a percentage point lower than the same time last year. Potential homebuyers are poised for a more affordable spring homebuying season."</em></p>
-      <p style="font-size:.65rem;line-height:1.6;color:var(--muted);margin-top:.5rem;">PMMS = weekly survey averages (20% down, excellent credit, conforming). Optimal Blue = daily rate locks across all borrower profiles.</p>
-    </div>
-    <div class="status-bar"><div class="status-dot"></div><span>Freddie Mac PMMS · freddiemac.com/pmms · Released weekly Thursdays 12pm ET · Updated Mar 24, 2026 05:46 PM UTC</span></div>
+    <div class="sb"><div class="sd"></div><span>Freddie Mac PMMS via FRED API · Series MORTGAGE30US / MORTGAGE15US · Released Thursdays 12pm ET</span></div>
   </div>
 
   <div class="two-col">
     <div>
-      <div class="section-label">MBA Application Activity · HousingWire / MBA</div>
+      <div class="slbl">MBA Application Activity · HousingWire / MBA</div>
       <div class="panel">
-        <div class="panel-header"><h3>Mortgage Purchase Applications Index</h3><span class="badge badge-red">MBA via HousingWire</span></div>
-        <div class="mba-section">
-          <div class="chart-label">Total Applications — Week-over-Week Change</div>
-              <div class="bar-row">
-      <div class="bar-week">Mar 13</div>
-      <div class="bar-track"><div class="bar-inner" style="width:91%;background:var(--down);"><span>-10.9%</span></div></div>
-      <div class="bar-tag" style="color:var(--down);">↓ Sharp drop</div>
-    </div>
-    <div class="bar-row">
-      <div class="bar-week">Mar 6</div>
-      <div class="bar-track"><div class="bar-inner" style="width:27%;background:var(--up);"><span>+3.2%</span></div></div>
-      <div class="bar-tag" style="color:var(--up);">↑ Rising</div>
-    </div>
-    <div class="bar-row">
-      <div class="bar-week">Feb 27</div>
-      <div class="bar-track"><div class="bar-inner" style="width:92%;background:var(--up);"><span>+11.0%</span></div></div>
-      <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
-    </div>
-          <div class="divider"></div>
-          <div class="chart-label">Purchase Index Only — Week-over-Week Change</div>
-              <div class="bar-row">
-      <div class="bar-week">Mar 13</div>
-      <div class="bar-track"><div class="bar-inner" style="width:8%;background:var(--up);"><span>+0.9%</span></div></div>
-      <div class="bar-tag" style="color:var(--up);">↑ Resilient</div>
-    </div>
-    <div class="bar-row">
-      <div class="bar-week">Mar 6</div>
-      <div class="bar-track"><div class="bar-inner" style="width:65%;background:var(--up);"><span>+7.8%</span></div></div>
-      <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
-    </div>
-    <div class="bar-row">
-      <div class="bar-week">Feb 27</div>
-      <div class="bar-track"><div class="bar-inner" style="width:51%;background:var(--up);"><span>+6.1%</span></div></div>
-      <div class="bar-tag" style="color:var(--up);">↑ Strong</div>
-    </div>
-          <div class="divider"></div>
-          <p style="font-size:.71rem;line-height:1.7;color:var(--muted);">Purchase apps <strong style="color:var(--ink);">+11% YoY</strong> (Mar 6). Refi share 57.8% of total apps (Mar 6). Refi apps down <strong style="color:var(--ink);">27%</strong> conventional WoW (Mar 13). New-home purchase apps <strong style="color:var(--ink);">+0.9% YoY</strong> (Feb). Estimated new SF home sales at <strong style="color:var(--ink);">641K annual pace</strong>.</p>
-        </div>
-        <div class="status-bar"><div class="status-dot"></div><span>MBA Weekly Mortgage Applications Survey via HousingWire · housingwire.com/mortgage-purchase-applications-index · Updated Mar 24, 2026 05:46 PM UTC</span></div>
+        <div class="ph"><h3>Mortgage Purchase Applications</h3><span class="badge badge-blue">MBA via HousingWire</span></div>
+        <div class="mba-section"><div style="padding:.5rem 0;color:var(--muted);font-size:.75rem;">MBA data temporarily unavailable.</div></div>
+        <div class="sb"><div class="sd"></div><span>MBA Weekly Mortgage Applications Survey via HousingWire · Updated Wednesdays</span></div>
       </div>
     </div>
     <div>
-      <div class="section-label">Latest Headlines · fortune.com/section/real-estate</div>
+      <div class="slbl">Fannie Mae ESR Forecast · Latest · Live via API</div>
+      <div class="tbl-wrap" style="margin-bottom:0;">
+        <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">Fannie Mae API</span></div>
+        <table class="ftable">
+          <thead><tr><th>Period</th><th>Forecast</th><th>Source</th><th>Signal</th></tr></thead>
+          <tbody>
+<tr><td class="td-type">Q1 2026</td><td class="fc fc-neu">—</td><td class="fc fc-neu">—</td><td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr>
+<tr><td class="td-type">Q2 2026</td><td class="fc fc-neu">—</td><td class="fc fc-neu">—</td><td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr>
+<tr><td class="td-type">Q3 2026</td><td class="fc fc-neu">—</td><td class="fc fc-neu">—</td><td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr>
+<tr><td class="td-type">Q4 2026</td><td class="fc fc-neu">—</td><td class="fc fc-neu">—</td><td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr>
+<tr><td class="td-type">Full Year 2027</td><td class="fc fc-neu">—</td><td class="fc fc-neu">—</td><td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr></tbody>
+        </table>
+        <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Auto-updated monthly</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="slbl">Industry News · Inman</div>
       <div class="panel">
-        <div class="panel-header"><h3>Market News</h3><span class="badge badge-red">Fortune · March 24, 2026</span></div>
+        <div class="ph"><h3>Inman Real Estate News</h3><span class="badge badge-blue">Inman</span></div>
+        
+    <a class="news-item" href="https://www.inman.com/2026/03/24/a-new-platform-says-you-dont-need-an-agent-to-sell-your-home/" target="_blank" rel="noopener">
+      <div class="ni-date">Tue, 24 Mar 2026</div>
+      <div class="ni-title">A new platform says you don’t need an agent to sell your home</div>
+    </a>
+    <a class="news-item" href="https://www.inman.com/2026/03/24/massive-real-estate-fraud-case-expands-with-new-charges/" target="_blank" rel="noopener">
+      <div class="ni-date">Tue, 24 Mar 2026</div>
+      <div class="ni-title">Massive real estate fraud case expands with new charges</div>
+    </a>
+    <a class="news-item" href="https://www.inman.com/2026/03/24/inman-appoints-experienced-media-executive-as-new-ceo/" target="_blank" rel="noopener">
+      <div class="ni-date">Tue, 24 Mar 2026</div>
+      <div class="ni-title">Inman appoints experienced media executive as new CEO</div>
+    </a>
+    <a class="news-item" href="https://www.inman.com/2026/03/24/how-this-luxury-agent-closed-her-best-year-ever-while-grappling-with-a-high-risk-pregnancy/" target="_blank" rel="noopener">
+      <div class="ni-date">Tue, 24 Mar 2026</div>
+      <div class="ni-title">How this luxury agent closed her best year ever while grappling with a high-risk pregnancy</div>
+    </a>
+    <a class="news-item" href="https://www.inman.com/2026/03/24/7-real-estate-problems-agents-misdiagnose-and-how-to-fix-them/" target="_blank" rel="noopener">
+      <div class="ni-date">Tue, 24 Mar 2026</div>
+      <div class="ni-title">7 real estate problems agents misdiagnose (and how to fix them)</div>
+    </a>
+    <a class="news-item" href="https://www.inman.com/2026/03/23/how-to-avoid-being-ambushed-by-a-cash-flow-crunch/" target="_blank" rel="noopener">
+      <div class="ni-date">Mon, 23 Mar 2026</div>
+      <div class="ni-title">How to avoid being ambushed by a cash flow crunch</div>
+    </a>
+        <div class="sb"><div class="sd"></div><span>feeds.feedburner.com/inmannews · Auto-refreshed daily</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="slbl">Market News · Fortune</div>
+      <div class="panel">
+        <div class="ph"><h3>Fortune Real Estate</h3><span class="badge badge-blue">Fortune</span></div>
         
     <a class="news-item" href="https://fortune.com/2026/03/23/us-government-insolvent-fiscal-crisis-fix/?itm_source=parsely-api" target="_blank" rel="noopener">
       <div class="ni-date">Mar 23, 2026</div>
@@ -268,133 +349,117 @@
       <div class="ni-date">Mar 23, 2026</div>
       <div class="ni-title">It took 200 years for national debt to hit $1 trillion. Annual interest alone now exceeds that—a &#x27;crushing legacy we must reverse,&#x27; says budget chair</div>
     </a>
-        <div class="status-bar"><div class="status-dot"></div><span>fortune.com/section/real-estate/ · Scraped Mar 24, 2026 05:46 PM UTC</span></div>
+        <div class="sb"><div class="sd"></div><span>fortune.com/feed/section/real-estate/ · Auto-refreshed daily</span></div>
       </div>
     </div>
   </div>
 
-  <div class="section-label">Fannie Mae ESR Group — March 2026 Housing Forecast · fanniemae.com/data-and-insights/forecast</div>
-  <div class="table-wrap">
-    <div class="panel-header"><h3>30-Year Fixed Rate Forecast — Fannie Mae March 2026</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
-    <table class="ftable">
-      <thead><tr><th>Period</th><th>Fannie Mae Forecast</th><th>vs February Forecast</th><th>Freddie Mac PMMS (Actual)</th><th>Signal</th></tr></thead>
-      <tbody>
-    <tr>
-      <td class="td-type">Q1 2026 (ending)</td>
-      <td class="fc fc-neu">6.00%</td>
-      <td class="fc fc-neu">↓ was 6.10%</td>
-      <td class="fc fc-neu">6.00%–6.22% observed</td>
-      <td><span class="fc-tag fc-tag-neutral">Near floor</span></td>
-    </tr>
-    <tr>
-      <td class="td-type">Q2 2026</td>
-      <td class="fc fc-good">5.90%</td>
-      <td class="fc fc-good">↓ more bullish</td>
-      <td class="fc fc-neu">—</td>
-      <td><span class="fc-tag fc-tag-green">Sub-6% approaching</span></td>
-    </tr>
-    <tr>
-      <td class="td-type">Q3 2026</td>
-      <td class="fc fc-good">5.80%</td>
-      <td class="fc fc-good">↓ more bullish</td>
-      <td class="fc fc-neu">—</td>
-      <td><span class="fc-tag fc-tag-green">Gradual easing</span></td>
-    </tr>
-    <tr>
-      <td class="td-type">Q4 2026</td>
-      <td class="fc fc-good">5.70%</td>
-      <td class="fc fc-good">↓ more bullish</td>
-      <td class="fc fc-neu">—</td>
-      <td><span class="fc-tag fc-tag-green">Lowest since 2022</span></td>
-    </tr>
-    <tr>
-      <td class="td-type">Full Year 2027</td>
-      <td class="fc fc-good">5.60–5.70%</td>
-      <td class="fc fc-good">↓ improved</td>
-      <td class="fc fc-neu">—</td>
-      <td><span class="fc-tag fc-tag-green">Continued easing</span></td>
-    </tr></tbody>
-    </table>
-    <div style="padding:.85rem 1.1rem;">
-      <p style="font-size:.72rem;line-height:1.7;color:var(--muted);">March forecast more optimistic than February across all periods — driven by slower projected GDP growth and a lower 10-year Treasury yield. Fewer single-family starts (−6.2% YoY) limit inventory, keeping prices elevated despite lower rates.</p>
-    </div>
-    <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR Group · March 2026 Housing Forecast · fanniemae.com/data-and-insights/forecast · Updated Mar 24, 2026 05:46 PM UTC</span></div>
-  </div>
-
-  <div class="section-label">Fannie Mae Housing Market Outlook · March 2026</div>
+  <div class="slbl">Fannie Mae ESR · Economic & Housing Outlook · Latest</div>
   <div class="three-col">
-    <div class="outlook-card">
-      <div class="panel-header"><h3>Construction Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
-      <div class="oc-body">
-        <div class="oc-val">−6.2%</div>
-        <div class="oc-sub">Single-family starts YoY 2026</div>
-        <div class="oc-text">Starts revised down vs Feb for Q1–Q3. Q4 2026 and 2027 revised <strong>higher</strong> — 2027 now +5.1% YoY vs +2.4% prior. Total annual starts ~<strong>1.3M</strong>. High rates, lot constraints, and uncertainty remain top builder concerns.</div>
+    <div class="panel">
+      <div class="ph"><h3>Housing Market Outlook</h3><span class="badge badge-gold">Fannie Mae API</span></div>
+      <div style="padding:1rem 1.25rem;">
+        <div class="econ-grid" style="margin-bottom:.85rem;border:1px solid var(--border);border-radius:6px;">
+          <div class="econ-cell">
+            <div class="ec-label">Total Home Sales</div>
+            <div class="ec-val">~5.5M</div>
+            <div class="ec-sub">ESR Forecast 2026</div>
+          </div>
+          <div class="econ-cell">
+            <div class="ec-label">SF Starts YoY</div>
+            <div class="ec-val">−6.2%</div>
+            <div class="ec-sub">Single-family 2026</div>
+          </div>
+        </div>
+        <p style="font-size:.72rem;line-height:1.65;color:var(--muted);">Both new and existing segments contributing to sales growth. Limited inventory despite lower rates keeps prices elevated. Spring season showing improving purchase applications vs last year.</p>
       </div>
-      <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae March 2026 Housing Forecast</span></div>
+      <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Latest</span></div>
     </div>
-    <div class="outlook-card">
-      <div class="panel-header"><h3>Home Sales Outlook</h3><span class="badge badge-gold">Fannie Mae</span></div>
-      <div class="oc-body">
-        <div class="oc-val">~5.5M</div>
-        <div class="oc-sub">Total home sales projected 2026</div>
-        <div class="oc-text">Meaningful rise expected vs 2025. Existing-home sales <strong>+1.7% in February</strong>. Spring season showing improving purchase apps and pending sales. Rates ~45bps below year-ago support buyer engagement.</div>
+    <div class="panel">
+      <div class="ph"><h3>Economic Indicators</h3><span class="badge badge-gold">Fannie Mae API</span></div>
+      <div style="padding:1rem 1.25rem;">
+        <div class="econ-grid" style="border:1px solid var(--border);border-radius:6px;">
+          <div class="econ-cell">
+            <div class="ec-label">GDP Growth</div>
+            <div class="ec-val">N/A</div>
+            <div class="ec-sub">EOY 2026 Forecast</div>
+          </div>
+          <div class="econ-cell">
+            <div class="ec-label">Unemployment</div>
+            <div class="ec-val">N/A</div>
+            <div class="ec-sub">EOY 2026 Forecast</div>
+          </div>
+          <div class="econ-cell">
+            <div class="ec-label">CPI Inflation</div>
+            <div class="ec-val">N/A</div>
+            <div class="ec-sub">EOY 2026 Forecast</div>
+          </div>
+          <div class="econ-cell">
+            <div class="ec-label">10-Yr Treasury</div>
+            <div class="ec-val">N/A</div>
+            <div class="ec-sub">EOY 2026 Forecast</div>
+          </div>
+        </div>
       </div>
-      <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR · Dec 2025 / March 2026 Forecasts</span></div>
+      <div class="sb"><div class="sd"></div><span>Fannie Mae Economic Indicators API · Latest</span></div>
     </div>
-    <div class="outlook-card">
-      <div class="panel-header"><h3>Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
-      <div class="oc-body" style="padding-top:.9rem;">
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Slower GDP growth — weaker economy supports rate declines but signals demand risk</div>
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Limited inventory — prices elevated, affordability constrained for first-time buyers</div>
-        <div class="risk-item"><span class="risk-up">↑ Risk:</span> Middle East conflict + oil pushing Treasury yields higher near-term</div>
-        <div class="risk-item"><span class="risk-dn">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers better positioned than 2025</div>
+    <div class="panel">
+      <div class="ph"><h3>Consumer Sentiment · HPSI</h3><span class="badge badge-gold">Fannie Mae API</span></div>
+      <div style="padding:1.25rem;">
+        <div style="font-size:3.5rem;font-weight:800;line-height:1;margin-bottom:.35rem;color:var(--nz-blue);">N/A</div>
+        <div style="font-family:'DM Mono',monospace;font-size:.54rem;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;letter-spacing:.07em;">Home Purchase Sentiment · </div>
+        <p style="font-size:.72rem;line-height:1.65;color:var(--muted);">Monthly National Housing Survey of 1,000 consumers distilled into a single forward-looking indicator. Higher = more positive sentiment toward buying a home.</p>
       </div>
-      <div class="status-bar"><div class="status-dot"></div><span>Fannie Mae ESR Group · March 2026 Economic Forecast</span></div>
+      <div class="sb"><div class="sd"></div><span>Fannie Mae NHS API · /v1/nhs/hpsi · Monthly</span></div>
     </div>
   </div>
+
 </main>
 
 <footer>
-  <strong>PropertyPulse</strong> · Auto-updated daily via GitHub Actions &nbsp;|&nbsp;
-  Fortune.com · Optimal Blue · Freddie Mac PMMS (freddiemac.com/pmms) · Fannie Mae ESR (fanniemae.com/data-and-insights/forecast) · MBA/HousingWire (housingwire.com/mortgage-purchase-applications-index) &nbsp;|&nbsp;
-  Not financial advice. &nbsp;|&nbsp; Last updated: Mar 24, 2026 05:46 PM UTC
+  <div style="font-size:.54rem;line-height:1.8;color:var(--muted);">
+    Auto-updated daily via GitHub Actions &nbsp;·&nbsp;
+    OBMMI: Optimal Blue via FRED &nbsp;·&nbsp;
+    PMMS: Freddie Mac via FRED &nbsp;·&nbsp;
+    Fannie Mae ESR APIs &nbsp;·&nbsp;
+    MBA via HousingWire &nbsp;·&nbsp;
+    Inman &amp; Fortune RSS &nbsp;·&nbsp;
+    Not financial advice &nbsp;·&nbsp; Mar 24, 2026 07:15 PM UTC
+  </div>
+  <div class="footer-logo"><img src="data:image/png;base64,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" alt="Newzip"></div>
 </footer>
 
 <script>
-const RATES = [{"type": "30-Year Conventional", "lb": "30Y CONV", "rate": 6.356, "prev": 6.214, "bps": 15, "dod": "+11bps"}, {"type": "15-Year Conventional", "lb": "15Y CONV", "rate": 5.707, "prev": 5.507, "bps": 20, "dod": "+6bps"}, {"type": "30-Year Jumbo", "lb": "30Y JUMBO", "rate": 6.597, "prev": 6.454, "bps": 15, "dod": "+13bps"}, {"type": "30-Year FHA", "lb": "30Y FHA", "rate": 6.164, "prev": 6.014, "bps": 15, "dod": "+10bps"}, {"type": "30-Year VA", "lb": "30Y VA", "rate": 5.999, "prev": 5.83, "bps": 17, "dod": "+9bps"}, {"type": "30-Year USDA", "lb": "30Y USDA", "rate": 6.033, "prev": 5.968, "bps": 6, "dod": "+15bps"}];
+const RATES = [{"type": "30-Year Conventional", "lb": "30Y CONV", "rate": 6.356, "prev": 6.214, "bps": 14, "dod": "+14bps", "date": "N/A"}, {"type": "15-Year Conventional", "lb": "15Y CONV", "rate": 5.707, "prev": 5.507, "bps": 20, "dod": "+20bps", "date": "N/A"}, {"type": "30-Year Jumbo", "lb": "30Y JUMBO", "rate": 6.597, "prev": 6.454, "bps": 14, "dod": "+14bps", "date": "N/A"}, {"type": "30-Year FHA", "lb": "30Y FHA", "rate": 6.164, "prev": 6.014, "bps": 15, "dod": "+15bps", "date": "N/A"}, {"type": "30-Year VA", "lb": "30Y VA", "rate": 5.999, "prev": 5.83, "bps": 17, "dod": "+17bps", "date": "N/A"}, {"type": "30-Year USDA", "lb": "30Y USDA", "rate": 6.033, "prev": 5.968, "bps": 6, "dod": "+6bps", "date": "N/A"}];
 function renderCard(r) {
-  const u = r.bps >= 0;
-  const pct = Math.min(100, Math.round(r.rate/8*100));
-  const dir = u ? 'up' : 'dn';
-  const arrow = u ? '▲' : '▼';
+  var u = r.bps >= 0;
+  var pct = Math.min(100, Math.round(r.rate/8*100));
+  var dir = u ? 'up' : 'dn';
+  var arrow = u ? '▲' : '▼';
+  var col = u ? 'var(--nz-red)' : 'var(--nz-teal)';
   return '<div class="rate-card">'
     + '<div class="rc-label">' + r.lb + '</div>'
     + '<div class="rc-value">' + r.rate.toFixed(3) + '%</div>'
-    + '<div class="rc-chg ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + 'bps WoW</div>'
-    + '<div class="rc-prev">Prev wk: ' + r.prev.toFixed(3) + '%</div>'
-    + '<div class="rc-bar" style="width:' + pct + '%"></div>'
+    + '<div class="rc-chg ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + 'bps</div>'
+    + '<div class="rc-prev">Prev: ' + r.prev.toFixed(3) + '%</div>'
     + '</div>';
 }
 function renderRow(r) {
-  const u = r.bps >= 0;
-  const bp = Math.min(100, Math.round(Math.abs(r.bps)/25*100));
-  const dir = u ? 'up' : 'dn';
-  const arrow = u ? '▲' : '▼';
-  const col = u ? 'var(--down)' : 'var(--up)';
+  var u = r.bps >= 0;
+  var bp = Math.min(100, Math.round(Math.abs(r.bps)/25*100));
+  var dir = u ? 'up' : 'dn';
+  var arrow = u ? '▲' : '▼';
+  var col = u ? 'var(--nz-red)' : 'var(--nz-teal)';
   return '<tr>'
     + '<td class="td-type">' + r.type + '</td>'
     + '<td class="td-rate">' + r.rate.toFixed(3) + '%</td>'
     + '<td class="td-prev">' + r.prev.toFixed(3) + '%</td>'
     + '<td class="td-bps ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + '</td>'
-    + '<td class="td-prev" style="color:' + col + ';">' + r.dod + '</td>'
     + '<td><div class="bar-wrap"><div class="bar-fill" style="width:' + bp + '%;background:' + col + '"></div></div></td>'
     + '</tr>';
 }
-function init() {
-  document.getElementById('rate-grid').innerHTML = RATES.map(renderCard).join('');
-  document.getElementById('rate-tbody').innerHTML = RATES.map(renderRow).join('');
-}
-init();
+document.getElementById('rate-grid').innerHTML = RATES.map(renderCard).join('');
+document.getElementById('rate-tbody').innerHTML = RATES.map(renderRow).join('');
 </script>
 </body>
 </html>
