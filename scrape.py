@@ -206,6 +206,42 @@ def fetch_pmms():
             "prev_30y":round(p30,2) if p30 else None,"prev_15y":round(p15,2) if p15 else None,
             "date":date_str,"yago_30y":round(r30_yago,2) if r30_yago else None}
 
+# ── MORTGAGE/TREASURY SPREAD ──────────────────────────────────────────────────
+
+def fetch_spread():
+    """
+    Fetch 30yr mortgage vs 10yr Treasury spread via FRED.
+    MORTGAGE30US (weekly) minus DGS10 (daily) = spread in basis points.
+    Historically ~170bps; elevated spread (>250bps) signals lender risk premium.
+    """
+    print("Fetching 30yr/10yr spread from FRED...")
+    r30, _, d30 = fred_two("MORTGAGE30US")
+    t10, _, d10 = fred_two("DGS10")
+    if r30 is None or t10 is None:
+        return {"spread_bps": None, "r30": r30, "t10": t10, "date_30": d30, "date_10": d10}
+    spread_bps = round((r30 - t10) * 100)
+    # Historical context: pre-2022 normal ~170bps, 2023 peak ~310bps
+    if spread_bps < 200:
+        signal = "Tight"
+        signal_cls = "nz-teal"
+    elif spread_bps < 250:
+        signal = "Normal"
+        signal_cls = "nz-teal"
+    else:
+        signal = "Elevated"
+        signal_cls = "nz-red"
+    print(f"  30yr:{r30:.2f}% 10yr:{t10:.2f}% Spread:{spread_bps}bps ({signal})")
+    return {
+        "spread_bps": spread_bps,
+        "r30":        round(r30, 2),
+        "t10":        round(t10, 2),
+        "date_30":    d30,
+        "date_10":    d10,
+        "signal":     signal,
+        "signal_cls": signal_cls,
+    }
+
+
 # ── FANNIE HOUSING ────────────────────────────────────────────────────────────
 
 def fetch_fannie_housing():
@@ -411,65 +447,142 @@ def fetch_mba():
         m = re.search(r"week ending\s+(\w+ \d+,?\s*\d{4})", text, re.I)
         return m.group(1).strip() if m else ""
 
-    # ── PRIMARY: MBA.org newsroom ──────────────────────────────────────────────
-    print("  Trying MBA.org newsroom...")
-    newsroom_html = fetch("https://www.mba.org/news-and-research/newsroom/news", timeout=25)
-    if newsroom_html:
-        pr_links = []
+    # ── PRIMARY: HousingWire MBA articles ────────────────────────────────────────
+    # HousingWire publishes a full public news article every Wednesday covering the
+    # MBA weekly survey — with complete purchase index figures in the article body.
+    # Article URLs follow pattern: housingwire.com/articles/mba-* or /mortgage-applications-*
+    print("  Trying HousingWire MBA articles...")
+    hw_search_urls = [
+        "https://www.housingwire.com/mortgage-news/",
+        "https://www.housingwire.com/category/mortgage/",
+    ]
+    hw_links = []
+    for search_url in hw_search_urls:
+        index_html = fetch(search_url, timeout=20)
+        if not index_html:
+            continue
         for m in re.finditer(
-            r'href="(/news-and-research/newsroom/news/\d{4}/\d{2}/\d{2}/mortgage-applications[^"]*)"'
-            , newsroom_html, re.I
+            r'href="(https://www\.housingwire\.com/articles/[^"]*(?:mba|mortgage-applications)[^"]*)"'
+            , index_html, re.I
         ):
-            url = "https://www.mba.org" + m.group(1)
-            if url not in pr_links:
-                pr_links.append(url)
-        print(f"  MBA newsroom: found {len(pr_links)} application press release links")
+            url = m.group(1).split("?")[0]
+            if url not in hw_links:
+                hw_links.append(url)
+        if hw_links:
+            break
 
-        for pr_url in pr_links[:3]:
-            pr_html = fetch(pr_url, timeout=25)
-            if not pr_html:
+    # Also try direct Google-style search for most recent HW MBA article
+    if not hw_links:
+        # Fetch HousingWire sitemap or tag page for MBA
+        sitemap_html = fetch("https://www.housingwire.com/tag/mba/", timeout=20)
+        if sitemap_html:
+            for m in re.finditer(
+                r'href="(https://www\.housingwire\.com/articles/[^"]+)"'
+                , sitemap_html, re.I
+            ):
+                url = m.group(1).split("?")[0]
+                if url not in hw_links:
+                    hw_links.append(url)
+
+    print(f"  HousingWire: found {len(hw_links)} candidate article links")
+
+    for hw_url in hw_links[:5]:
+        hw_html = fetch(hw_url, timeout=25)
+        if not hw_html:
+            continue
+        text = re.sub(r"<[^>]+>", " ", hw_html)
+        text = re.sub(r"\s+", " ", text)
+
+        # Only process if this is an MBA applications article
+        tl = text[:500].lower()
+        if "mortgage applications" not in tl and "purchase index" not in tl:
+            if "mba" not in tl or "application" not in tl:
                 continue
-            text = re.sub(r"<[^>]+>", " ", pr_html)
-            text = re.sub(r"\s+", " ", text)
 
-            purchase_val = extract_purchase_pct(text)
-            yoy_val      = extract_yoy_pct(text)
-            week_end     = extract_week_ending(text)
+        purchase_val = extract_purchase_pct(text)
+        yoy_val      = extract_yoy_pct(text)
+        week_end     = extract_week_ending(text)
 
-            title_m = re.search(r"<title>(.*?)</title>", pr_html, re.I | re.DOTALL)
-            h1_m    = re.search(r"<h1[^>]*>(.*?)</h1>", pr_html, re.I | re.DOTALL)
-            raw_title = h1_m or title_m
-            title = ""
-            if raw_title:
-                title = re.sub(r"<[^>]+>", "", raw_title.group(1)).strip()
-                title = re.sub(r"\s+", " ", title)
-                title = re.sub(r"\s*[|\-\u2013]\s*MBA.*$", "", title).strip()
+        title_m = re.search(r"<title>(.*?)</title>", hw_html, re.I | re.DOTALL)
+        h1_m    = re.search(r"<h1[^>]*>(.*?)</h1>", hw_html, re.I | re.DOTALL)
+        raw_title = h1_m or title_m
+        title = ""
+        if raw_title:
+            title = re.sub(r"<[^>]+>", "", raw_title.group(1)).strip()
+            title = re.sub(r"\s+", " ", title)
+            title = re.sub(r"\s*[|\-\u2013].*HousingWire.*$", "", title, flags=re.I).strip()
 
-            date_m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", pr_url)
-            date_str = ""
-            if date_m:
+        # Extract date from URL /YYYY/MM/DD/ or og:article:published_time
+        date_str = ""
+        date_m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", hw_url)
+        if date_m:
+            try:
+                dt = datetime.date(int(date_m.group(1)), int(date_m.group(2)), int(date_m.group(3)))
+                date_str = dt.strftime("%b %d, %Y")
+            except: pass
+        if not date_str:
+            pub_m = re.search(r'published[_-]time"\s+content="(\d{4}-\d{2}-\d{2})', hw_html, re.I)
+            if pub_m:
                 try:
-                    dt = datetime.date(int(date_m.group(1)), int(date_m.group(2)), int(date_m.group(3)))
+                    dt = datetime.datetime.strptime(pub_m.group(1), "%Y-%m-%d")
                     date_str = dt.strftime("%b %d, %Y")
                 except: pass
 
-            if not title:
-                title = "MBA Weekly Mortgage Applications Survey"
+        if not title:
+            title = "MBA Weekly Mortgage Applications Survey"
 
-            entry = {
-                "title":    title,
-                "url":      pr_url,
-                "date":     date_str,
-                "val":      purchase_val,
-                "yoy":      yoy_val,
-                "week_end": week_end,
-            }
-            items.append(entry)
-            if purchase_val is not None:
-                weeks.append(entry)
-                print(f"  MBA.org PR: Purchase Index {purchase_val:+.1f}% WoW ({week_end})")
+        entry = {
+            "title":    title,
+            "url":      hw_url,
+            "date":     date_str,
+            "val":      purchase_val,
+            "yoy":      yoy_val,
+            "week_end": week_end,
+        }
+        items.append(entry)
+        if purchase_val is not None:
+            weeks.append(entry)
+            print(f"  HousingWire: Purchase Index {purchase_val:+.1f}% WoW ({week_end}) — {title[:60]}")
 
-        if items:
+    if items:
+        print(f"  HousingWire: {len(items)} articles found, {len(weeks)} with purchase val")
+
+    # ── FALLBACK 1: MBA.org newsroom ──────────────────────────────────────────
+    if not items:
+        print("  Falling back to MBA.org newsroom...")
+        newsroom_html = fetch("https://www.mba.org/news-and-research/newsroom/news", timeout=25)
+        if newsroom_html:
+            pr_links = []
+            for m in re.finditer(
+                r'href="(/news-and-research/newsroom/news/\d{4}/\d{2}/\d{2}/mortgage-applications[^"]*)"'
+                , newsroom_html, re.I
+            ):
+                url = "https://www.mba.org" + m.group(1)
+                if url not in pr_links:
+                    pr_links.append(url)
+
+            for pr_url in pr_links[:3]:
+                pr_html = fetch(pr_url, timeout=25)
+                if not pr_html: continue
+                text = re.sub(r"<[^>]+>", " ", pr_html)
+                text = re.sub(r"\s+", " ", text)
+                purchase_val = extract_purchase_pct(text)
+                yoy_val      = extract_yoy_pct(text)
+                week_end     = extract_week_ending(text)
+                title_m = re.search(r"<h1[^>]*>(.*?)</h1>", pr_html, re.I | re.DOTALL)
+                title = re.sub(r"<[^>]+>", "", title_m.group(1)).strip() if title_m else "MBA Weekly Survey"
+                date_m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", pr_url)
+                date_str = ""
+                if date_m:
+                    try:
+                        dt = datetime.date(int(date_m.group(1)), int(date_m.group(2)), int(date_m.group(3)))
+                        date_str = dt.strftime("%b %d, %Y")
+                    except: pass
+                entry = {"title": title, "url": pr_url, "date": date_str,
+                         "val": purchase_val, "yoy": yoy_val, "week_end": week_end}
+                items.append(entry)
+                if purchase_val is not None:
+                    weeks.append(entry)
             print(f"  MBA.org: {len(items)} press releases, {len(weeks)} with purchase val")
 
     # ── FALLBACK 1: Calculated Risk Blog RSS ───────────────────────────────────
@@ -641,7 +754,7 @@ def build_fannie_rows(housing):
             )
     return rows
 
-def build_ticker(rates, pmms, hpsi):
+def build_ticker(rates, pmms, hpsi, spread=None):
     r30   = pmms.get("rate_30y") or 0
     r15   = pmms.get("rate_15y") or 0
     pdate = pmms.get("date","")
@@ -655,6 +768,9 @@ def build_ticker(rates, pmms, hpsi):
         ("PMMS 15Y", f"{r15:.2f}%", "chup", "Weekly avg"),
         ("FED RATE",  "3.50–3.75%", "", "HOLD"),
     ]
+    if spread and spread.get("spread_bps"):
+        s_cls = "chdn" if spread["spread_bps"] <= 250 else "chup"
+        items.append(("30Y/10Y", f"{spread['spread_bps']}bps", s_cls, spread.get("signal","")))
     if hpsi: items.append(("HPSI", f"{hpsi['value']}", "chup", f"Sentiment · {hpsi['date']}"))
     items.append(("1YR AGO", f"{yago:.2f}%", "chdn", f"{'▼' if yoy<=0 else '▲'} {abs(yoy):.0f}bps YoY"))
     for r in rates:
@@ -674,13 +790,13 @@ def build_ticker(rates, pmms, hpsi):
 
 # ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
-def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, mba):
+def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, mba, spread):
     rates_json     = json.dumps(rates)
     fortune_html   = build_news_items(news_fortune)
     inman_html     = build_news_items(news_inman, show_desc=True)
     mba_html_str   = build_mba_html(mba)
     fannie_rows_str = build_fannie_rows(housing)
-    ticker_str     = build_ticker(rates, pmms, hpsi)
+    ticker_str     = build_ticker(rates, pmms, hpsi, spread)
 
     r30   = pmms.get("rate_30y") or 0
     r15   = pmms.get("rate_15y") or 0
@@ -720,6 +836,15 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
     obmmi_date = rates[0]["date"] if rates else "N/A"
     try: obmmi_date = datetime.datetime.strptime(obmmi_date,"%Y-%m-%d").strftime("%b %d, %Y")
     except: pass
+
+    # Spread calculations
+    spread_bps_str    = f"{spread.get('spread_bps')}bps" if spread.get('spread_bps') else "N/A"
+    spread_r30        = spread.get('r30') or "—"
+    spread_t10        = spread.get('t10') or "—"
+    spread_signal     = spread.get('signal') or "—"
+    _spread_sig_color = spread.get('signal_cls','muted')
+    spread_cls        = "pos" if _spread_sig_color == "nz-teal" else "neg"
+    spread_signal_label = f"{spread_signal} · Historical norm ~170bps"
 
     mba_headline,mba_date = "","" 
     for src in [mba.get("weeks",[]), mba.get("items",[])]:
@@ -932,10 +1057,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
       <div class="st-chg {yoy_cls}">{yoy_label}</div>
     </div>
     <div class="stat-tile">
-      <div class="st-label">MBA Applications</div>
-      <div class="st-val" style="font-size:1.3rem;line-height:1.2;">{mba_short}</div>
-      <div class="st-sub">{mba_date}</div>
-      <div class="st-chg pos">Weekly MBA Survey · HousingWire</div>
+      <div class="st-label">30Y/10Y Spread</div>
+      <div class="st-val">{spread_bps_str}</div>
+      <div class="st-sub">30Y {spread_r30}% · 10Y {spread_t10}% · FRED</div>
+      <div class="st-chg {spread_cls}">{spread_signal_label}</div>
     </div>
   </div>
 
@@ -989,9 +1114,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
     <div>
       <div class="slbl">MBA Application Activity · HousingWire / MBA</div>
       <div class="panel">
-        <div class="ph"><h3>MBA Mortgage Applications</h3><span class="badge badge-blue">MBA via mba.org</span></div>
+        <div class="ph"><h3>MBA Mortgage Applications</h3><span class="badge badge-blue">MBA via HousingWire</span></div>
         <div class="mba-section">{mba_html_str}</div>
-        <div class="sb"><div class="sd"></div><span>MBA Weekly Applications Survey · mba.org newsroom · Updated Wednesdays · Calculated Risk Blog fallback</span></div>
+        <div class="sb"><div class="sd"></div><span>MBA Weekly Applications Survey · HousingWire · Updated Wednesdays · mba.org fallback</span></div>
       </div>
     </div>
     <div>
@@ -1005,6 +1130,34 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
         <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Est. values from Mar 2026 ESR when API unavailable · Auto-updated monthly</span></div>
       </div>
     </div>
+  </div>
+
+  <div class="slbl">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
+  <div class="panel" style="margin-bottom:2rem;">
+    <div class="ph"><h3>30Y Mortgage / 10Y Treasury Spread</h3><span class="badge badge-blue">FRED API</span></div>
+    <div class="pmms-strip">
+      <div class="pmms-cell">
+        <div class="pmms-lbl">Current Spread</div>
+        <div class="pmms-val" style="color:{'var(--nz-red)' if spread.get('spread_bps',0) and spread['spread_bps'] > 250 else 'var(--nz-teal)'};">{spread_bps_str}</div>
+        <div class="pmms-sub">30Y minus 10Y Treasury</div>
+      </div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">30Y Mortgage</div>
+        <div class="pmms-val">{spread_r30}%</div>
+        <div class="pmms-sub">PMMS weekly avg</div>
+      </div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">10Y Treasury</div>
+        <div class="pmms-val">{spread_t10}%</div>
+        <div class="pmms-sub">FRED DGS10 · Daily</div>
+      </div>
+      <div class="pmms-cell">
+        <div class="pmms-lbl">Signal</div>
+        <div class="pmms-val" style="font-size:1rem;color:{'var(--nz-red)' if spread.get('signal') == 'Elevated' else 'var(--nz-teal)'};">{spread_signal}</div>
+        <div class="pmms-sub">Pre-2022 norm ~170bps · 2023 peak ~310bps</div>
+      </div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>FRED API · MORTGAGE30US (weekly) minus DGS10 (daily) · Spread tracks lender risk premium above risk-free rate · Updated daily</span></div>
   </div>
 
   <div class="two-col">
@@ -1152,11 +1305,12 @@ if __name__ == "__main__":
     housing  = fetch_fannie_housing()
     economic = fetch_fannie_economic()
     hpsi     = fetch_fannie_hpsi()
+    spread       = fetch_spread()
     news_fortune = fetch_fortune_news()
     news_inman   = fetch_inman_news()
     mba          = fetch_mba()
 
-    html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, mba)
+    html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, mba, spread)
     html = html.replace("{LOGO_SRC}", LOGO_SRC)
 
     with open("index.html","w",encoding="utf-8") as f:
@@ -1171,4 +1325,3 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  MBA weeks    : {len(mba.get('weeks',[]))}")
     print(f"{'='*60}\n")
-
