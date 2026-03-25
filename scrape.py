@@ -369,6 +369,111 @@ def fetch_inman_news():
 
 def fetch_fortune_news():
     """
+    Fetch housing/mortgage news. Source priority:
+    1. Mortgage News Daily RSS — confirmed fresh, housing/mortgage focused, public feed
+    2. Inman RSS fallback (already fetched separately, but just in case)
+    """
+    print("Fetching Mortgage News Daily RSS...")
+    articles = []
+    seen = set()
+
+    # Primary: Mortgage News Daily industry news RSS
+    for feed_url in [
+        "https://www.mortgagenewsdaily.com/rss/news",
+        "https://www.mortgagenewsdaily.com/rss/full",
+    ]:
+        if articles: break
+        raw = fetch(feed_url, timeout=20, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
+        if not raw: continue
+        for m in re.finditer(r'<item>(.*?)</item>', raw, re.DOTALL | re.IGNORECASE):
+            block = m.group(1)
+            title_m = re.search(r'<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>', block, re.DOTALL)
+            link_m  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
+            pub_m   = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
+            if not (title_m and link_m): continue
+            title = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
+            url   = link_m.group(1).strip()
+            pub   = pub_m.group(1).strip() if pub_m else ""
+            if url in seen or len(title) < 10: continue
+            seen.add(url)
+            try:
+                dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+                date_str = dt.strftime("%b %d, %Y")
+            except: date_str = pub[:16]
+            articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
+            if len(articles) >= 6: break
+
+    # Fallback: HousingWire
+    if not articles:
+        raw = fetch("https://www.housingwire.com/feed/", timeout=20)
+        if raw:
+            for m in re.finditer(r'<item>(.*?)</item>', raw, re.DOTALL | re.IGNORECASE):
+                block = m.group(1)
+                title_m = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', block, re.DOTALL)
+                link_m  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
+                pub_m   = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
+                if not (title_m and link_m): continue
+                title = title_m.group(1).strip()
+                url   = link_m.group(1).strip()
+                pub   = pub_m.group(1).strip() if pub_m else ""
+                if url in seen or len(title) < 10: continue
+                seen.add(url)
+                try:
+                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+                    date_str = dt.strftime("%b %d, %Y")
+                except: date_str = pub[:16]
+                articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
+                if len(articles) >= 6: break
+
+    print(f"  Housing news: {len(articles)} articles")
+    return articles
+
+def fetch_inman_news():
+    print("Fetching Inman News RSS...")
+    raw = fetch("https://feeds.feedburner.com/inmannews")
+    articles = []
+    seen = set()
+
+    # CDATA title pattern
+    for m in re.finditer(
+        r'<item>.*?<title><!\[CDATA\[(.*?)\]\]></title>.*?<link>(.*?)</link>.*?<pubDate>(.*?)</pubDate>.*?<description><!\[CDATA\[(.*?)\]\]></description>',
+        raw, re.DOTALL
+    ):
+        title = m.group(1).strip()
+        url   = m.group(2).strip()
+        pub   = m.group(3).strip()
+        desc  = re.sub(r'<[^>]+>','',m.group(4).strip())[:160]
+        if url in seen or len(title) < 10: continue
+        seen.add(url)
+        try:
+            dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+            date_str = dt.strftime("%b %d, %Y")
+        except: date_str = pub[:16]
+        articles.append({"title":title,"url":url,"date":date_str,"desc":desc})
+        if len(articles) >= 6: break
+
+    # Fallback: plain title tags
+    if not articles:
+        for m in re.finditer(r'<title>(.*?)</title>.*?<link>(.*?)</link>.*?<pubDate>(.*?)</pubDate>', raw, re.DOTALL):
+            title = re.sub(r'<[^>]+>','',m.group(1)).strip()
+            url   = m.group(2).strip()
+            pub   = m.group(3).strip()
+            if url in seen or 'inman.com' not in url or len(title)<10: continue
+            seen.add(url)
+            try:
+                dt = datetime.datetime.strptime(pub[:25],"%a, %d %b %Y %H:%M")
+                date_str = dt.strftime("%b %d, %Y")
+            except: date_str = pub[:16]
+            articles.append({"title":title,"url":url,"date":date_str,"desc":""})
+            if len(articles) >= 6: break
+
+    print(f"  Inman: {len(articles)} articles")
+    return articles
+
+# ── FORTUNE RSS ───────────────────────────────────────────────────────────────
+
+def fetch_fortune_news():
+    """
     Fetch housing market news from Calculated Risk Blog RSS.
     Replaces Fortune RSS which was returning off-topic articles.
     Calculated Risk is housing/mortgage focused, updated daily.
@@ -1034,11 +1139,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       </div>
     </div>
     <div>
-      <div class="slbl">Housing Market News · Calculated Risk</div>
+      <div class="slbl">Housing Market News · Mortgage News Daily</div>
       <div class="panel">
-        <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">HousingWire</span></div>
+        <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">Mortgage News Daily</span></div>
         {fortune_html}
-        <div class="sb"><div class="sd"></div><span>housingwire.com · Housing &amp; mortgage market news · Auto-refreshed daily</span></div>
+        <div class="sb"><div class="sd"></div><span>mortgagenewsdaily.com · Mortgage &amp; housing industry news · Auto-refreshed daily</span></div>
       </div>
     </div>
   </div>
