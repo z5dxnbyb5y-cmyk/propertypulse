@@ -926,7 +926,7 @@ def build_ticker(rates, pmms, hpsi, spread=None):
 
 # ── AI SUMMARY ────────────────────────────────────────────────────────────────
 
-def build_summary(rates, pmms, spread, pending, housing, economic):
+def build_summary(rates, pmms, spread, pending, housing, economic, redfin_market=None, zillow_market=None):
     """
     Call Claude API to generate a 1-minute market briefing from live data.
     Returns an HTML string. Falls back to a static summary if API key missing or call fails.
@@ -934,7 +934,7 @@ def build_summary(rates, pmms, spread, pending, housing, economic):
     key = (ANTHROPIC_API_KEY or "").strip()
     if not key:
         print("  Summary: ANTHROPIC_API_KEY not set, using fallback")
-        return _summary_fallback(rates, pmms, spread, pending)
+        return _summary_fallback(rates, pmms, spread, pending, redfin_market=redfin_market)
 
     r30   = pmms.get("rate_30y") or 0
     p30   = pmms.get("prev_30y") or r30
@@ -972,25 +972,57 @@ def build_summary(rates, pmms, spread, pending, housing, economic):
     if home_sales: housing_line += f"Fannie Mae forecasts ~{home_sales}M total home sales this year"
     if sf_starts is not None: housing_line += f", SF starts {sf_starts:+.1f}% YoY"
 
-    prompt = f"""You are a housing market analyst writing the daily briefing for a real estate professional.
+    # Build real estate market context from Redfin/Zillow
+    rf = redfin_market or {}
+    zl = zillow_market or {}
+    supply     = rf.get("months_of_supply") or 4.0
+    dom        = rf.get("median_dom")
+    dom_yoy    = rf.get("median_dom_yoy")
+    inv_yoy    = rf.get("inventory_yoy")
+    price_drop = rf.get("pct_price_drops")
+    stl        = rf.get("avg_sale_to_list")
+    re_price   = rf.get("median_sale_price")
+    re_price_yoy = rf.get("median_sale_price_yoy")
+    zhvi       = zl.get("zhvi")
+    zhvi_yoy   = zl.get("zhvi_yoy")
+
+    if supply < 3:   market_cond = "a seller's market (under 3 months supply)"
+    elif supply < 5: market_cond = f"a balanced market ({supply:.1f} months supply)"
+    else:            market_cond = f"a buyer's market ({supply:.1f} months supply)"
+
+    re_lines = []
+    if supply: re_lines.append(f"Market conditions: {market_cond}")
+    if dom and dom_yoy is not None: re_lines.append(f"Median days on market: {int(dom)} days ({dom_yoy:+g}d YoY — homes {'sitting longer' if dom_yoy > 0 else 'moving faster'} than last year)")
+    if inv_yoy is not None: re_lines.append(f"Active inventory: {inv_yoy:+g}% YoY ({'more' if inv_yoy > 0 else 'less'} homes available than a year ago)")
+    if price_drop: re_lines.append(f"Price drops: {price_drop:.1f}% of homes have had price reductions")
+    if stl: re_lines.append(f"Sale-to-list ratio: {stl:.1f}% ({'buyers getting discounts' if stl < 99 else 'homes selling near or above ask'})")
+    if re_price and re_price_yoy: re_lines.append(f"Median sale price: ${re_price:,.0f} ({re_price_yoy:+.1f}% YoY)")
+    elif zhvi and zhvi_yoy: re_lines.append(f"Zillow Home Value Index: ${zhvi:,.0f} ({zhvi_yoy:+.1f}% YoY)")
+    re_context = "\n".join(f"- {l}" for l in re_lines) if re_lines else "- Real estate data unavailable"
+
+    prompt = f"""You are a market strategist writing a daily briefing for loan officers (LOs) at a real estate company.
+
+Your audience is LOs who need to know: what is the market doing, and what should they DO about it today — whether that's a talking point with a client, a reason to call a buyer who's been sitting on the fence, or context for why now is or isn't a good time to act.
 
 Today's data ({TODAY_STR}):
-- PMMS 30Y fixed: {r30:.2f}% as of {pdate} ({bps30:+.1f}bps WoW, {yoy:+d}bps vs one year ago {yago:.2f}%)
+
+MORTGAGE RATES:
+- PMMS 30Y fixed: {r30:.2f}% ({bps30:+.1f}bps week-over-week, {yoy:+d}bps vs one year ago at {yago:.2f}%)
 - {obmmi_line}
-- 30Y/10Y spread: {spread_bps}bps ({spread_sig}) — historical norm ~170bps, 2023 peak ~310bps
-- {sales_line}
-- {econ_line}
-- {housing_line}
+- 30Y/10Y spread: {spread_bps}bps ({spread_sig}) — norm ~170bps
+
+REAL ESTATE MARKET (Redfin national data):
+{re_context}
 
 Write a "1-minute briefing" with exactly these three parts, each on its own line with the label in caps:
 
-THE SIGNAL: One crisp sentence naming the single most important thing happening in the market today (rate direction, spread context, or sales momentum — whichever is most notable).
+THE SIGNAL: The single most actionable thing happening across rates AND the real estate market right now. Lead with what matters most to an LO today — inventory shift, rate trend, buyer opportunity, or seller leverage. Be specific with numbers.
 
-WHAT IT MEANS: One sentence explaining what this means for a buyer, seller, or agent in plain language. No jargon.
+WHAT IT MEANS FOR LOs: One concrete sentence on how an LO should use this. Think: talking point with a hesitant buyer, reason to call a fence-sitter, context for a rate conversation, or market timing angle. Plain language, no jargon.
 
-WATCH FOR: One specific forward-looking thing to monitor this week (upcoming data release, rate trigger level, seasonal pattern, etc.).
+WATCH FOR: One specific data point or event this week that could shift the picture (data release, Fed commentary, rate level to watch, seasonal pattern).
 
-Be direct and concrete. Use the actual numbers. No preamble, no sign-off. Total length: 3 sentences."""
+Be direct. Use the actual numbers. No preamble, no sign-off. Total length: 3 sentences."""
 
     print("  Summary: calling Claude API...")
     try:
@@ -1016,7 +1048,7 @@ Be direct and concrete. Use the actual numbers. No preamble, no sign-off. Total 
         return _format_summary_html(text)
     except Exception as e:
         print(f"  Summary: API call failed ({e}), using fallback")
-        return _summary_fallback(rates, pmms, spread, pending)
+        return _summary_fallback(rates, pmms, spread, pending, redfin_market=redfin_market)
 
 
 def _format_summary_html(text):
@@ -1026,8 +1058,8 @@ def _format_summary_html(text):
         line = line.strip()
         if line.upper().startswith("THE SIGNAL:"):
             signal = line[len("THE SIGNAL:"):].strip()
-        elif line.upper().startswith("WHAT IT MEANS:"):
-            what = line[len("WHAT IT MEANS:"):].strip()
+        elif line.upper().startswith("WHAT IT MEANS FOR LOS:") or line.upper().startswith("WHAT IT MEANS:"):
+            what = line.split(":", 1)[1].strip() if ":" in line else line
         elif line.upper().startswith("WATCH FOR:"):
             watch = line[len("WATCH FOR:"):].strip()
     # Fallback: just split into three chunks if labels weren't found
@@ -1040,26 +1072,42 @@ def _format_summary_html(text):
     if signal:
         rows += f'<div class="brief-row"><span class="brief-lbl">The Signal</span><span class="brief-val">{signal}</span></div>'
     if what:
-        rows += f'<div class="brief-row"><span class="brief-lbl">What It Means</span><span class="brief-val">{what}</span></div>'
+        rows += f'<div class="brief-row"><span class="brief-lbl">What It Means for LOs</span><span class="brief-val">{what}</span></div>'
     if watch:
         rows += f'<div class="brief-row brief-row-last"><span class="brief-lbl">Watch For</span><span class="brief-val">{watch}</span></div>'
     return rows
 
 
-def _summary_fallback(rates, pmms, spread, pending):
-    """Static fallback when API unavailable."""
+def _summary_fallback(rates, pmms, spread, pending, redfin_market=None):
+    """Static fallback when API unavailable — includes real estate context."""
     r30  = pmms.get("rate_30y") or 0
     p30  = pmms.get("prev_30y") or r30
+    yago = pmms.get("yago_30y") or 0
     bps  = round((r30 - p30) * 100, 1)
+    yoy  = round((r30 - yago) * 100) if yago else 0
     dir_ = "up" if bps >= 0 else "down"
     sp   = spread.get("spread_bps")
-    sp_s = spread.get("signal", "")
-    signal = f"30Y fixed at {r30:.2f}%, {abs(bps):.0f}bps {dir_} week-over-week."
-    what   = f"Spread at {sp}bps ({sp_s}) — {'above' if sp and sp > 200 else 'near'} historical norm of ~170bps." if sp else ""
-    watch  = "Thursday: Freddie Mac PMMS update. Watch for rate direction confirmation."
+    rf   = redfin_market or {}
+    supply = rf.get("months_of_supply")
+    dom    = rf.get("median_dom")
+    dom_yoy = rf.get("median_dom_yoy")
+    inv_yoy = rf.get("inventory_yoy")
+
+    # Build signal from most notable data point
+    re_note = ""
+    if supply and dom and dom_yoy is not None:
+        if supply < 3:
+            re_note = f" Seller's market ({supply:.1f}mo supply) — homes moving in {int(dom)}d."
+        elif supply >= 5:
+            re_note = f" Buyer's market ({supply:.1f}mo supply) — inventory up {inv_yoy:+g}% YoY."
+        else:
+            re_note = f" Balanced market ({supply:.1f}mo supply), {int(dom)} days on market."
+
+    signal = f"30Y fixed {r30:.2f}% — {abs(bps):.0f}bps {dir_} WoW, {abs(yoy)}bps {'below' if yoy <= 0 else 'above'} last year.{re_note}"
+    what   = f"{'Rates are cheaper than a year ago — use the YoY comparison as a buyer talking point.' if yoy < 0 else 'Rates are higher than a year ago — focus conversation on market conditions and negotiating power.'}"
+    watch  = "Thursday: Freddie Mac PMMS. Track whether inventory and days-on-market trends continue shifting toward buyers."
     rows = f'<div class="brief-row"><span class="brief-lbl">The Signal</span><span class="brief-val">{signal}</span></div>'
-    if what:
-        rows += f'<div class="brief-row"><span class="brief-lbl">What It Means</span><span class="brief-val">{what}</span></div>'
+    rows += f'<div class="brief-row"><span class="brief-lbl">What It Means for LOs</span><span class="brief-val">{what}</span></div>'
     rows += f'<div class="brief-row brief-row-last"><span class="brief-lbl">Watch For</span><span class="brief-val">{watch}</span></div>'
     return rows
 
@@ -1072,7 +1120,8 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     inman_html     = build_news_items(news_inman, show_desc=True)
     pending_html_str = build_pending_html(pending)
     fannie_rows_str = build_fannie_rows(housing)
-    summary_html   = build_summary(rates, pmms, spread, pending, housing, economic)
+    summary_html   = build_summary(rates, pmms, spread, pending, housing, economic,
+                                       redfin_market=redfin_market, zillow_market=zillow_market)
     redfin_market  = redfin_market or {}
     zillow_market  = zillow_market or {}
     pulse_html     = build_housing_pulse_html(redfin_market, zillow_market)
@@ -1359,12 +1408,6 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
-  <div class="slbl" id="housing-pulse">Housing Market Pulse · Redfin &amp; Zillow Data</div>
-  <div class="panel" style="margin-bottom:2rem;overflow:hidden;padding:0;">
-    <div class="ph"><h3>National Housing Market Conditions</h3><span class="badge badge-teal">Redfin · Zillow</span></div>
-    {pulse_html}
-  </div>
-
   <div class="brief-card">
     <div class="brief-head">
       <div class="brief-pulse"></div>
@@ -1374,6 +1417,12 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     <div class="brief-body">
       {summary_html}
     </div>
+  </div>
+
+  <div class="slbl" id="housing-pulse">Housing Market Pulse · Redfin &amp; Zillow Data</div>
+  <div class="panel" style="margin-bottom:2rem;overflow:hidden;padding:0;">
+    <div class="ph"><h3>National Housing Market Conditions</h3><span class="badge badge-teal">Redfin · Zillow</span></div>
+    {pulse_html}
   </div>
 
   <div class="slbl">Key Indicators · {TODAY_STR}</div>
