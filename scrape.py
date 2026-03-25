@@ -675,12 +675,25 @@ def build_ticker(rates, pmms, hpsi, spread=None):
         a = "▲" if r["bps"]>=0 else "▼"
         items.append((f"OB {r['lb']}", f"{r['rate']:.3f}%", d, f"{a}{abs(r['bps'])}bps"))
 
-    def ti(label,val,cls,chg):
+    TICKER_TIPS = {
+        "PMMS 30Y":  f"Freddie Mac Primary Mortgage Market Survey · 30Y fixed · Weekly · As of {pdate}",
+        "PMMS 15Y":  f"Freddie Mac PMMS · 15Y fixed · Weekly avg · As of {pdate}",
+        "FED RATE":  "Federal Reserve target rate · Currently on hold · Next meeting Apr 28–29, 2026",
+        "30Y/10Y":   "Spread between 30Y mortgage & 10Y Treasury · Tracks lender risk premium · Norm ~170bps",
+        "HPSI":      "Fannie Mae Home Purchase Sentiment Index · Consumer housing confidence survey",
+        "1YR AGO":   f"PMMS 30Y rate one year ago · Year-over-year comparison",
+    }
+    for r in rates:
+        TICKER_TIPS[f"OB {r['lb']}"] = f"Optimal Blue OBMMI · Actual locked rates from ~35% of US transactions · Daily"
+
+    def ti(label, val, cls, chg):
+        tip = TICKER_TIPS.get(label, label)
         if label == "FED RATE":
             chg_s = f'<span style="color:#ffd88a">{chg}</span>'
         else:
             chg_s = f'<span class="{cls}">{chg}</span>'
-        return f'<div class="ticker-item"><span class="lb">{label}</span><span>{val}</span>{chg_s}</div>'
+        return (f'<div class="ticker-item" data-tip="{tip}">'
+                f'<span class="lb">{label}</span><span>{val}</span>{chg_s}</div>')
 
     single = "\n    ".join(ti(*i) for i in items)
     return single + "\n    " + single
@@ -833,7 +846,6 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     inman_html     = build_news_items(news_inman, show_desc=True)
     pending_html_str = build_pending_html(pending)
     fannie_rows_str = build_fannie_rows(housing)
-    ticker_str     = build_ticker(rates, pmms, hpsi, spread)
     summary_html   = build_summary(rates, pmms, spread, pending, housing, economic)
 
     r30   = pmms.get("rate_30y") or 0
@@ -914,19 +926,19 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   body{{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px}}
   a{{color:inherit;text-decoration:none}}
 
-  /* HEADER */
-  header{{background:white;border-bottom:1px solid var(--border);padding:0 1.5rem;box-shadow:0 1px 4px rgba(76,109,225,.08)}}
-  .hi{{max-width:1280px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 0}}
-  .logo-wrap img{{height:28px;display:block}}
-  .header-title{{font-size:.78rem;font-weight:600;color:var(--nz-blue);letter-spacing:.04em;text-transform:uppercase}}
-  .hmeta{{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;line-height:1.7}}
-
-  /* NAV */
-  .nav-wrap{{background:white;border-bottom:1px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.05)}}
-  .nav-inner{{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:.25rem;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}}
+  /* HEADER + NAV — merged into one sticky bar */
+  .topbar{{background:white;border-bottom:2px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(76,109,225,.08)}}
+  .topbar-inner{{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:auto 1fr auto;align-items:stretch;gap:0}}
+  .logo-wrap{{display:flex;align-items:center;padding:.75rem 1.5rem .75rem 0;border-right:1px solid var(--border);gap:.75rem}}
+  .logo-wrap img{{height:24px;display:block}}
+  .header-title{{font-size:.68rem;font-weight:600;color:var(--nz-blue);letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}}
+  .nav-inner{{display:flex;align-items:stretch;gap:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;padding:0 .5rem}}
   .nav-inner::-webkit-scrollbar{{display:none}}
-  .nav-link{{font-family:'DM Mono',monospace;font-size:.58rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:.55rem .75rem;white-space:nowrap;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}}
+  .nav-link{{font-family:'DM Mono',monospace;font-size:.6rem;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:0 .9rem;white-space:nowrap;display:flex;align-items:center;border-bottom:3px solid transparent;border-top:3px solid transparent;transition:color .15s,border-color .15s}}
   .nav-link:hover{{color:var(--nz-blue);border-bottom-color:var(--nz-blue)}}
+  .nav-link:nth-child(1):hover,.nav-link:nth-child(2):hover{{border-bottom-color:var(--nz-teal);color:var(--nz-teal)}}
+  .topbar-meta{{display:flex;align-items:center;padding:.75rem 0 .75rem 1.5rem;border-left:1px solid var(--border)}}
+  .hmeta{{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);text-align:right;line-height:1.7}}
 
   /* TOOLTIP */
   .tip-wrap{{position:relative;display:inline-flex;align-items:center}}
@@ -934,12 +946,8 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .tip-wrap .tip::after{{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink)}}
   .tip-wrap:hover .tip{{display:block}}
 
-  /* TICKER */
-  .ticker-wrap{{background:var(--nz-blue);overflow:hidden;padding:.38rem 0}}
-  .ticker{{display:flex;gap:3rem;animation:scroll 55s linear infinite;width:max-content}}
-  .ticker-item{{font-family:'DM Mono',monospace;font-size:.62rem;color:rgba(255,255,255,.9);white-space:nowrap;display:flex;align-items:center;gap:.3rem}}
-  .ticker-item .lb{{opacity:.65}}.chup{{color:#a8ffc8}}.chdn{{color:#ffa8a8}}
-  @keyframes scroll{{0%{{transform:translateX(0)}}100%{{transform:translateX(-50%)}}}}
+  /* chup/chdn still used elsewhere */
+  .chup{{color:var(--nz-teal)}}.chdn{{color:var(--nz-red)}}
 
   /* LAYOUT */
   main{{max-width:1280px;margin:0 auto;padding:1.75rem 1.5rem}}
@@ -956,16 +964,19 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .fed-note p{{font-size:.75rem;line-height:1.65;color:rgba(255,255,255,.9)}}.fed-note strong{{color:white}}
 
   /* 1-MIN BRIEFING */
-  .brief-card{{background:white;border:1px solid var(--border);border-radius:10px;margin-bottom:2rem;overflow:hidden;box-shadow:0 1px 6px rgba(76,109,225,.07)}}
-  .brief-head{{background:var(--nz-blue-light);border-bottom:1px solid var(--border);padding:.65rem 1.25rem;display:flex;align-items:center;gap:.75rem}}
-  .brief-head-label{{font-family:'DM Mono',monospace;font-size:.58rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--nz-blue)}}
-  .brief-head-sub{{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted)}}
-  .brief-pulse{{width:8px;height:8px;border-radius:50%;background:var(--nz-blue);flex-shrink:0;animation:pulse 2s ease-in-out infinite}}
-  @keyframes pulse{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.5;transform:scale(.85)}}}}
-  .brief-row{{display:grid;grid-template-columns:110px 1fr;gap:1rem;padding:.75rem 1.25rem;border-bottom:1px solid var(--border);align-items:baseline}}
+  .brief-card{{background:linear-gradient(135deg,#4C6DE1 0%,#005E53 100%);border-radius:12px;margin-bottom:2rem;overflow:hidden;box-shadow:0 4px 28px rgba(76,109,225,.25)}}
+  .brief-head{{padding:1.1rem 1.5rem .6rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid rgba(255,255,255,.12)}}
+  .brief-head-label{{font-family:'DM Mono',monospace;font-size:.62rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.65)}}
+  .brief-head-sub{{font-family:'DM Mono',monospace;font-size:.52rem;color:rgba(255,255,255,.4);margin-left:auto}}
+  .brief-pulse{{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.85);flex-shrink:0;animation:pulse 2s ease-in-out infinite}}
+  @keyframes pulse{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.4;transform:scale(.8)}}}}
+  .brief-body{{padding:.25rem 0 .5rem}}
+  .brief-row{{display:grid;grid-template-columns:120px 1fr;gap:1.25rem;padding:.9rem 1.5rem;border-bottom:1px solid rgba(255,255,255,.1);align-items:start}}
   .brief-row-last{{border-bottom:none}}
-  .brief-lbl{{font-family:'DM Mono',monospace;font-size:.54rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--nz-blue);padding-top:.05rem}}
-  .brief-val{{font-size:.78rem;line-height:1.55;color:var(--ink)}}
+  .brief-row:first-child .brief-val{{font-size:1rem;font-weight:600;color:white;line-height:1.4}}
+  .brief-lbl{{font-family:'DM Mono',monospace;font-size:.54rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);padding-top:.2rem}}
+  .brief-row:first-child .brief-lbl{{color:rgba(255,255,255,.9);letter-spacing:.1em}}
+  .brief-val{{font-size:.8rem;line-height:1.6;color:rgba(255,255,255,.82)}}
 
   /* STAT TILES */
   .stat-tiles{{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}}
@@ -1063,40 +1074,30 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 </head>
 <body>
 
-<header>
-  <div class="hi">
-    <div style="display:flex;align-items:center;gap:1.5rem;">
-      <div class="logo-wrap"><img src="{{LOGO_SRC}}" alt="Newzip"></div>
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="logo-wrap">
+      <img src="{{LOGO_SRC}}" alt="Newzip">
       <div class="header-title">Market Tracker</div>
     </div>
-    <div class="hmeta">
-      <div>{TODAY_STR}</div>
-      <div>OBMMI · PMMS · Fannie Mae ESR · Existing Sales · Inman · Fortune</div>
+    <nav class="nav-inner">
+      <a class="nav-link" href="#rates">Rates</a>
+      <a class="nav-link" href="#pmms">PMMS</a>
+      <a class="nav-link" href="#spread">Spread</a>
+      <a class="nav-link" href="#home-sales">Home Sales</a>
+      <a class="nav-link" href="#forecast">Forecast</a>
+      <a class="nav-link" href="#industry-news">Industry News</a>
+      <a class="nav-link" href="#housing-news">Housing News</a>
+      <a class="nav-link" href="#outlook">Outlook</a>
+    </nav>
+    <div class="topbar-meta">
+      <div class="hmeta">
+        <div>{TODAY_STR} · Auto-updated daily</div>
+        <div>Last run: {RUN_TS}</div>
+      </div>
     </div>
-    <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;">
-      Auto-updated daily<br>Last run: {RUN_TS}
-    </div>
-  </div>
-</header>
-
-<div class="ticker-wrap">
-  <div class="ticker">
-    {ticker_str}
   </div>
 </div>
-
-<nav class="nav-wrap">
-  <div class="nav-inner">
-    <a class="nav-link" href="#rates">Rates</a>
-    <a class="nav-link" href="#pmms">PMMS</a>
-    <a class="nav-link" href="#spread">Spread</a>
-    <a class="nav-link" href="#home-sales">Home Sales</a>
-    <a class="nav-link" href="#forecast">Forecast</a>
-    <a class="nav-link" href="#industry-news">Industry News</a>
-    <a class="nav-link" href="#housing-news">Housing News</a>
-    <a class="nav-link" href="#outlook">Outlook</a>
-  </div>
-</nav>
 
 <main>
 
@@ -1112,9 +1113,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     <div class="brief-head">
       <div class="brief-pulse"></div>
       <div class="brief-head-label">1-Minute Briefing</div>
-      <div class="brief-head-sub">AI-generated from today's live data · {RUN_TS}</div>
+      <div class="brief-head-sub">AI · {RUN_TS}</div>
     </div>
-    {summary_html}
+    <div class="brief-body">
+      {summary_html}
+    </div>
   </div>
 
   <div class="slbl">Key Indicators · {TODAY_STR}</div>
@@ -1373,6 +1376,7 @@ function renderRow(r) {{
 }}
 document.getElementById('rate-grid').innerHTML = RATES.map(renderCard).join('');
 document.getElementById('rate-tbody').innerHTML = RATES.map(renderRow).join('');
+
 </script>
 </body>
 </html>"""
