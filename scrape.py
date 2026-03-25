@@ -445,9 +445,9 @@ def fetch_pending():
         date_str = datetime.datetime.strptime(current["date"], "%Y-%m-%d").strftime("%b %Y")
     except:
         date_str = current["date"]
-    # FRED EXHOSLUSM495S is in thousands of units — divide by 1000 for millions
-    cur_m  = round(current['val'] / 1000, 2)
-    prev_m = round(prev_mo['val'] / 1000, 2) if prev_mo else None
+    # FRED EXHOSLUSM495S is in actual units — divide by 1,000,000 for millions
+    cur_m  = round(current['val'] / 1_000_000, 2)
+    prev_m = round(prev_mo['val'] / 1_000_000, 2) if prev_mo else None
     if mom is not None and yoy is not None:
         print(f"  Existing Home Sales: {cur_m:.2f}M SAAR ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
     else:
@@ -458,7 +458,7 @@ def fetch_pending():
         "yoy":     yoy,
         "mom":     mom,
         "date":    date_str,
-        "history": [{"val": round(o["val"] / 1000, 2), "date": o["date"]} for o in valid[:6]],
+        "history": [{"val": round(o["val"] / 1_000_000, 2), "date": o["date"]} for o in valid[:6]],
     }
 
 
@@ -495,38 +495,52 @@ def build_pending_html(pending):
     mom_str   = f"{mom_arrow} {abs(mom):.1f}% MoM" if mom is not None else "MoM N/A"
     yoy_str   = f"{yoy_arrow} {abs(yoy):.1f}% YoY" if yoy is not None else "YoY N/A"
 
-    bars = ""
+    # Labeled bar chart — each bar has the value on top and month label below
+    chart = ""
     if hist:
-        vals = [h["val"] for h in reversed(hist)]
+        items = list(reversed(hist))  # oldest to newest left-to-right
+        vals  = [h["val"] for h in items]
         min_v = min(vals)
-        rng   = (max(vals) - min_v) or 1
-        for i, v in enumerate(vals):
-            # Normalize to range so small month-to-month differences are visible
-            h_pct = max(15, round(((v - min_v) / rng) * 75 + 15))
-            is_last = i == len(vals) - 1
-            col = "var(--nz-blue)" if is_last else "var(--border)"
-            bars += f'<div style="flex:1;height:{h_pct}%;background:{col};border-radius:2px 2px 0 0;min-width:8px;"></div>'
+        rng   = (max(vals) - min_v) or 0.01
+        for i, h in enumerate(items):
+            v       = h["val"]
+            is_last = (i == len(items) - 1)
+            h_px    = max(20, round(((v - min_v) / rng) * 60 + 20))
+            bar_bg  = "var(--nz-blue)" if is_last else "var(--paper2)"
+            bar_bdr = "var(--nz-blue)" if is_last else "var(--border)"
+            lbl_col = "var(--nz-blue)" if is_last else "var(--muted)"
+            val_col = "white" if is_last else "var(--ink)"
+            try:
+                mo = datetime.datetime.strptime(h["date"], "%Y-%m-%d").strftime("%b")
+            except:
+                mo = str(h["date"])[:3]
+            chart += (
+                f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">'
+                f'<div style="font-family:\'DM Mono\',monospace;font-size:.46rem;color:{val_col};font-weight:600;white-space:nowrap;">{v:.2f}M</div>'
+                f'<div style="width:100%;height:{h_px}px;background:{bar_bg};border-radius:3px 3px 0 0;border:1px solid {bar_bdr};"></div>'
+                f'<div style="font-family:\'DM Mono\',monospace;font-size:.48rem;color:{lbl_col};font-weight:{"600" if is_last else "400"};">{mo}</div>'
+                f'</div>'
+            )
 
-    return (
-        '\n<div style="padding:1rem 1.25rem;">'
-        '\n  <div style="display:flex;align-items:flex-end;gap:1.5rem;margin-bottom:1rem;">'
-        '\n    <div>'
-        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">SAAR &middot; {date}</div>'
-        f'\n      <div style="font-size:2.2rem;font-weight:700;line-height:1;color:var(--ink);">{val:.2f}M</div>'
-        '\n      <div style="font-family:\'DM Mono\',monospace;font-size:.54rem;color:var(--muted);margin-top:.2rem;">Millions of units, seasonally adjusted annual rate</div>'
-        '\n    </div>'
-        '\n    <div style="display:flex;flex-direction:column;gap:.4rem;">'
-        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.65rem;font-weight:600;color:{mom_col};">{mom_str}</div>'
-        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.65rem;font-weight:600;color:{yoy_col};">{yoy_str}</div>'
-        '\n    </div>'
-        '\n  </div>'
-        '\n  <div style="display:flex;align-items:flex-end;gap:3px;height:40px;background:var(--paper2);border-radius:4px;padding:4px;">'
-        f'\n    {bars}'
-        '\n  </div>'
-        '\n  <div style="font-family:\'DM Mono\',monospace;font-size:.5rem;color:var(--muted);margin-top:.3rem;">6-month trend (older left, newer right)</div>'
-        '\n</div>'
+    chart_block = (
+        f'<div style="display:flex;align-items:flex-end;gap:5px;padding:0 .1rem;margin-top:.75rem;">{chart}</div>'
+        if chart else ""
     )
 
+    out = '<div style="padding:1rem 1.25rem;">'
+    out += '<div style="display:flex;align-items:flex-end;gap:1.5rem;margin-bottom:.1rem;">'
+    out += '<div>'
+    out += f'<div style="font-family:\'DM Mono\',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">SAAR &middot; {date}</div>'
+    out += f'<div style="font-size:2.2rem;font-weight:700;line-height:1;color:var(--ink);">{val:.2f}M</div>'
+    out += '<div style="font-family:\'DM Mono\',monospace;font-size:.54rem;color:var(--muted);margin-top:.2rem;">Million units, seasonally adjusted annual rate</div>'
+    out += '</div>'
+    out += '<div style="display:flex;flex-direction:column;gap:.4rem;margin-left:auto;text-align:right;">'
+    out += f'<div style="font-family:\'DM Mono\',monospace;font-size:.65rem;font-weight:600;color:{mom_col};">{mom_str}</div>'
+    out += f'<div style="font-family:\'DM Mono\',monospace;font-size:.65rem;font-weight:600;color:{yoy_col};">{yoy_str}</div>'
+    out += '</div></div>'
+    out += chart_block
+    out += '</div>'
+    return out
 
 def build_fannie_rows(housing):
     year = TODAY.year
@@ -1148,4 +1162,3 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
     print(f"{'='*60}\n")
-
