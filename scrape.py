@@ -378,57 +378,54 @@ def fetch_fortune_news():
     articles = []
     seen = set()
 
-    # Primary: Calculated Risk Blog RSS
-    raw = fetch("https://www.calculatedriskblog.com/feeds/posts/default")
+    # Primary: HousingWire main RSS feed — confirmed fresh, housing/mortgage focused
+    raw = fetch("https://www.housingwire.com/feed/")
     if raw:
         for m in re.finditer(
-            r'<entry>(.*?)</entry>', raw, re.DOTALL | re.IGNORECASE
+            r'<item>(.*?)</item>', raw, re.DOTALL | re.IGNORECASE
         ):
             block = m.group(1)
-            title_m = re.search(r'<title[^>]*>(.*?)</title>', block, re.DOTALL)
-            link_m  = re.search(r'<link[^>]+href=["\']([^"\']+)["\']', block, re.DOTALL)
-            pub_m   = re.search(r'<published>(.*?)</published>', block, re.DOTALL)
+            title_m = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', block, re.DOTALL)
+            link_m  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
+            pub_m   = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
             if not (title_m and link_m): continue
-            title = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
+            title = title_m.group(1).strip()
             url   = link_m.group(1).strip()
             pub   = pub_m.group(1).strip() if pub_m else ""
             if url in seen or len(title) < 15: continue
-            # Skip posts that are clearly not housing-relevant
-            tl = title.lower()
-            if any(x in tl for x in ['hotel', 'stock market', 's&p', 'treasury auction', 'fed speak']): continue
             seen.add(url)
             try:
-                dt = datetime.datetime.strptime(pub[:10], "%Y-%m-%d")
+                dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
                 date_str = dt.strftime("%b %d, %Y")
-            except: date_str = pub[:10]
+            except: date_str = pub[:16]
             articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
             if len(articles) >= 6: break
 
-    # Fallback: HousingWire housing market RSS
+    # Fallback: Calculated Risk Blog Atom feed
     if not articles:
-        raw = fetch("https://www.housingwire.com/feed/")
+        raw = fetch("https://www.calculatedriskblog.com/feeds/posts/default")
         if raw:
             for m in re.finditer(
-                r'<item>(.*?)</item>', raw, re.DOTALL | re.IGNORECASE
+                r'<entry>(.*?)</entry>', raw, re.DOTALL | re.IGNORECASE
             ):
                 block = m.group(1)
-                title_m = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', block, re.DOTALL)
-                link_m  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
-                pub_m   = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
+                title_m = re.search(r'<title[^>]*>(.*?)</title>', block, re.DOTALL)
+                link_m  = re.search(r'<link[^>]+href=["\']([^"\']+)["\']', block, re.DOTALL)
+                pub_m   = re.search(r'<published>(.*?)</published>', block, re.DOTALL)
                 if not (title_m and link_m): continue
-                title = title_m.group(1).strip()
+                title = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
                 url   = link_m.group(1).strip()
                 pub   = pub_m.group(1).strip() if pub_m else ""
                 if url in seen or len(title) < 15: continue
                 seen.add(url)
                 try:
-                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+                    dt = datetime.datetime.strptime(pub[:10], "%Y-%m-%d")
                     date_str = dt.strftime("%b %d, %Y")
-                except: date_str = pub[:16]
+                except: date_str = pub[:10]
                 articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
                 if len(articles) >= 6: break
 
-    print(f"  Calculated Risk / HousingWire: {len(articles)} articles")
+    print(f"  HousingWire / Calculated Risk: {len(articles)} articles")
     return articles
 
 # ── PENDING HOME SALES ───────────────────────────────────────────────────────
@@ -1039,9 +1036,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     <div>
       <div class="slbl">Housing Market News · Calculated Risk</div>
       <div class="panel">
-        <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">Calculated Risk</span></div>
+        <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">HousingWire</span></div>
         {fortune_html}
-        <div class="sb"><div class="sd"></div><span>calculatedriskblog.com · Housing &amp; mortgage market analysis · Auto-refreshed daily</span></div>
+        <div class="sb"><div class="sd"></div><span>housingwire.com · Housing &amp; mortgage market news · Auto-refreshed daily</span></div>
       </div>
     </div>
   </div>
