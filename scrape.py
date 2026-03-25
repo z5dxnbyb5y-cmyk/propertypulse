@@ -410,7 +410,22 @@ def fetch_pending():
     Leading indicator: signed contracts ~30-60 days before closing.
     """
     print("Fetching Pending Home Sales from FRED...")
-    obs = fred("PENDING", limit=15)
+    key = (FRED_KEY or "").strip()
+    if not key:
+        print("  WARN: FRED_API_KEY not set, skipping PENDING")
+        return {"value": None, "prev": None, "date": None, "yoy": None, "mom": None}
+    params = urllib.parse.urlencode({
+        "series_id": "PENDING", "api_key": key, "file_type": "json",
+        "sort_order": "desc", "limit": 15,
+    })
+    raw = fetch(f"https://api.stlouisfed.org/fred/series/observations?{params}")
+    obs = []
+    if raw:
+        try:
+            data = json.loads(raw)
+            obs = [o for o in data.get("observations", []) if o.get("value") not in (".", "")]
+        except Exception as e:
+            print(f"  FRED parse error PENDING: {e}")
     if not obs:
         return {"value": None, "prev": None, "date": None, "yoy": None, "mom": None}
     valid = []
@@ -442,6 +457,22 @@ def fetch_pending():
         "date":    date_str,
         "history": [{"val": o["val"], "date": o["date"]} for o in valid[:6]],
     }
+
+
+def build_news_items(articles, show_desc=False):
+    if not articles:
+        return '<div style="padding:1rem;color:var(--muted);font-size:.75rem;">No articles available.</div>'
+    out = ""
+    for a in articles:
+        desc_html = f'\n      <div class="ni-desc">{a["desc"]}</div>' if show_desc and a.get("desc") else ""
+        out += (
+            f'\n    <a class="news-item" href="{a["url"]}" target="_blank" rel="noopener">'
+            f'\n      <div class="ni-date">{a["date"]}</div>'
+            f'\n      <div class="ni-title">{a["title"]}</div>'
+            f'{desc_html}'
+            f'\n    </a>'
+        )
+    return out
 
 
 def build_pending_html(pending):
