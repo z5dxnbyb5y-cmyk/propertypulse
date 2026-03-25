@@ -13,6 +13,7 @@ FRED_KEY             = os.environ.get("FRED_API_KEY", "")
 FANNIE_CLIENT_ID     = os.environ.get("FANNIE_CLIENT_ID", "")
 FANNIE_CLIENT_SECRET = os.environ.get("FANNIE_CLIENT_SECRET", "")
 FANNIE_BASE          = "https://api.fanniemae.com"
+ANTHROPIC_API_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # Debug: print key lengths at startup (values stay hidden, just confirms receipt)
 def _debug_secrets():
@@ -55,10 +56,13 @@ def post(url, data, headers=None, timeout=20):
 
 _fannie_token = None
 _fannie_token_expiry = None
+_fannie_token_failed = False  # set True after first complete failure; skip retries
 
 def get_fannie_token():
     """Authenticate with Fannie Mae Exchange APIs using AWS Cognito."""
-    global _fannie_token, _fannie_token_expiry
+    global _fannie_token, _fannie_token_expiry, _fannie_token_failed
+    if _fannie_token_failed:
+        return None  # already tried this run — don't retry
     if _fannie_token and _fannie_token_expiry and datetime.datetime.utcnow() < _fannie_token_expiry:
         return _fannie_token
     if not FANNIE_CLIENT_ID or not FANNIE_CLIENT_SECRET:
@@ -106,6 +110,7 @@ def get_fannie_token():
             print(f"  No response from {endpoint}")
 
     print("  All Fannie Mae token endpoints failed")
+    _fannie_token_failed = True
     return None
 
 
@@ -245,6 +250,9 @@ def fetch_spread():
 # ── FANNIE HOUSING ────────────────────────────────────────────────────────────
 
 def fetch_fannie_housing():
+    if _fannie_token_failed:
+        print("Fetching Fannie Mae Housing Indicators... skipped (auth failed earlier, using ESR fallback)")
+        return {"mortgage_rate_30y":{},"total_home_sales":None,"sf_starts":None,"report_date":None}
     print("Fetching Fannie Mae Housing Indicators...")
     year = TODAY.year
     result = {"mortgage_rate_30y":{},"total_home_sales":None,"sf_starts":None,"report_date":None}
@@ -285,6 +293,9 @@ def fetch_fannie_housing():
 # ── FANNIE ECONOMIC ───────────────────────────────────────────────────────────
 
 def fetch_fannie_economic():
+    if _fannie_token_failed:
+        print("Fetching Fannie Mae Economic Indicators... skipped (auth failed earlier, using ESR fallback)")
+        return {"fed_funds":None,"treasury_10y":None,"unemployment":None,"cpi":None,"gdp":None,"report_date":None}
     print("Fetching Fannie Mae Economic Indicators...")
     result = {"fed_funds":None,"treasury_10y":None,"unemployment":None,"cpi":None,"gdp":None,"report_date":None}
     year = TODAY.year
@@ -307,6 +318,9 @@ def fetch_fannie_economic():
 # ── FANNIE HPSI ───────────────────────────────────────────────────────────────
 
 def fetch_fannie_hpsi():
+    if _fannie_token_failed:
+        print("Fetching Fannie Mae HPSI... skipped (auth failed earlier)")
+        return None
     print("Fetching Fannie Mae HPSI...")
     data = fannie_get("/v1/nhs/hpsi")
     if not data or not isinstance(data,list): return None
@@ -369,63 +383,79 @@ def fetch_inman_news():
 
 def fetch_fortune_news():
     """
-    Fetch housing/mortgage news. Source priority:
-    1. Mortgage News Daily RSS — confirmed fresh, housing/mortgage focused, public feed
-    2. Inman RSS fallback (already fetched separately, but just in case)
+    Fetch housing/mortgage news. Merges MND + HousingWire by date so that
+    stale MND weeks get supplemented by HW articles, keeping the panel fresh.
+    Sources tried:
+      1. Mortgage News Daily RSS (rss/news, rss/full)
+      2. HousingWire RSS (merged in, not just a fallback)
     """
-    print("Fetching Mortgage News Daily RSS...")
-    articles = []
+    print("Fetching housing/mortgage news (MND + HousingWire merged)...")
+    all_articles = []
     seen = set()
 
-    # Primary: Mortgage News Daily industry news RSS
-    for feed_url in [
-        "https://www.mortgagenewsdaily.com/rss/news",
-        "https://www.mortgagenewsdaily.com/rss/full",
-    ]:
-        if articles: break
-        raw = fetch(feed_url, timeout=20, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
-        if not raw: continue
+    def _parse_items(raw, cdata_titles=False):
+        """Parse <item> blocks from RSS raw text. Returns list of dicts with dt key."""
+        out = []
         for m in re.finditer(r'<item>(.*?)</item>', raw, re.DOTALL | re.IGNORECASE):
             block = m.group(1)
-            title_m = re.search(r'<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>', block, re.DOTALL)
-            link_m  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
-            pub_m   = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
+            if cdata_titles:
+                title_m = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', block, re.DOTALL)
+            else:
+                title_m = re.search(r'<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>', block, re.DOTALL)
+            link_m = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
+            pub_m  = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
             if not (title_m and link_m): continue
             title = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
             url   = link_m.group(1).strip()
             pub   = pub_m.group(1).strip() if pub_m else ""
-            if url in seen or len(title) < 10: continue
-            seen.add(url)
+            if not url or len(title) < 10: continue
             try:
                 dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
-                date_str = dt.strftime("%b %d, %Y")
-            except: date_str = pub[:16]
-            articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
-            if len(articles) >= 6: break
-
-    # Fallback: HousingWire
-    if not articles:
-        raw = fetch("https://www.housingwire.com/feed/", timeout=20)
-        if raw:
-            for m in re.finditer(r'<item>(.*?)</item>', raw, re.DOTALL | re.IGNORECASE):
-                block = m.group(1)
-                title_m = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', block, re.DOTALL)
-                link_m  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
-                pub_m   = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
-                if not (title_m and link_m): continue
-                title = title_m.group(1).strip()
-                url   = link_m.group(1).strip()
-                pub   = pub_m.group(1).strip() if pub_m else ""
-                if url in seen or len(title) < 10: continue
-                seen.add(url)
+            except:
                 try:
-                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
-                    date_str = dt.strftime("%b %d, %Y")
-                except: date_str = pub[:16]
-                articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
-                if len(articles) >= 6: break
+                    dt = datetime.datetime.strptime(pub[:16], "%a, %d %b %Y")
+                except:
+                    dt = datetime.datetime.min
+            date_str = dt.strftime("%b %d, %Y") if dt != datetime.datetime.min else pub[:16]
+            out.append({"title": title, "url": url, "date": date_str, "desc": "", "dt": dt})
+        return out
 
-    print(f"  Housing news: {len(articles)} articles")
+    # Source 1: Mortgage News Daily
+    for feed_url in [
+        "https://www.mortgagenewsdaily.com/rss/news",
+        "https://www.mortgagenewsdaily.com/rss/full",
+    ]:
+        raw = fetch(feed_url, timeout=20, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
+        if not raw: continue
+        items = _parse_items(raw, cdata_titles=False)
+        for a in items:
+            if a["url"] not in seen:
+                seen.add(a["url"])
+                all_articles.append(a)
+        if items:
+            print(f"  MND ({feed_url.split('/')[-1]}): {len(items)} items, newest: {items[0]['date'] if items else '?'}")
+            break  # got MND articles, no need for second MND endpoint
+
+    # Source 2: HousingWire — always attempt, merge by date
+    raw = fetch("https://www.housingwire.com/feed/", timeout=20)
+    if raw:
+        items = _parse_items(raw, cdata_titles=True)
+        added = 0
+        for a in items:
+            if a["url"] not in seen:
+                seen.add(a["url"])
+                all_articles.append(a)
+                added += 1
+        print(f"  HousingWire: {added} new items merged")
+    else:
+        print("  HousingWire: no response (403 or timeout)")
+
+    # Sort all by date descending, take top 6
+    all_articles.sort(key=lambda x: x["dt"], reverse=True)
+    articles = [{"title": a["title"], "url": a["url"], "date": a["date"], "desc": a["desc"]}
+                for a in all_articles[:6]]
+
+    print(f"  Housing news final: {len(articles)} articles")
     return articles
 
 
@@ -655,6 +685,146 @@ def build_ticker(rates, pmms, hpsi, spread=None):
     single = "\n    ".join(ti(*i) for i in items)
     return single + "\n    " + single
 
+# ── AI SUMMARY ────────────────────────────────────────────────────────────────
+
+def build_summary(rates, pmms, spread, pending, housing, economic):
+    """
+    Call Claude API to generate a 1-minute market briefing from live data.
+    Returns an HTML string. Falls back to a static summary if API key missing or call fails.
+    """
+    key = (ANTHROPIC_API_KEY or "").strip()
+    if not key:
+        print("  Summary: ANTHROPIC_API_KEY not set, using fallback")
+        return _summary_fallback(rates, pmms, spread, pending)
+
+    r30   = pmms.get("rate_30y") or 0
+    p30   = pmms.get("prev_30y") or r30
+    yago  = pmms.get("yago_30y") or 0
+    pdate = pmms.get("date", "N/A")
+    bps30 = round((r30 - p30) * 100, 1)
+    yoy   = round((r30 - yago) * 100) if yago else 0
+
+    obmmi_30y = next((r for r in rates if "30Y CONV" in r.get("lb", "")), None)
+    obmmi_line = ""
+    if obmmi_30y:
+        obmmi_line = f"OBMMI 30Y Conv locked rate: {obmmi_30y['rate']:.3f}% ({obmmi_30y['bps']:+d}bps day-over-day, as of {obmmi_30y['date']})"
+
+    spread_bps = spread.get("spread_bps") or "N/A"
+    spread_sig = spread.get("signal") or "N/A"
+
+    pending_val  = pending.get("value")
+    pending_date = pending.get("date", "")
+    pending_mom  = pending.get("mom")
+    pending_yoy  = pending.get("yoy")
+    sales_line = ""
+    if pending_val:
+        sales_line = f"Existing Home Sales: {pending_val:.2f}M SAAR as of {pending_date}"
+        if pending_mom: sales_line += f" (MoM {pending_mom:+.1f}%)"
+        if pending_yoy: sales_line += f" (YoY {pending_yoy:+.1f}%)"
+
+    gdp   = economic.get("gdp")
+    unemp = economic.get("unemployment")
+    cpi   = economic.get("cpi")
+    econ_line = f"Fannie Mae ESR: GDP {gdp:.1f}%, UE {unemp:.1f}%, CPI {cpi:.1f}%" if gdp else "Fannie Mae Mar 2026 ESR: GDP ~2.3%, UE ~4.2%, CPI ~2.7%"
+
+    home_sales = housing.get("total_home_sales")
+    sf_starts  = housing.get("sf_starts")
+    housing_line = ""
+    if home_sales: housing_line += f"Fannie Mae forecasts ~{home_sales}M total home sales this year"
+    if sf_starts is not None: housing_line += f", SF starts {sf_starts:+.1f}% YoY"
+
+    prompt = f"""You are a housing market analyst writing the daily briefing for a real estate professional.
+
+Today's data ({TODAY_STR}):
+- PMMS 30Y fixed: {r30:.2f}% as of {pdate} ({bps30:+.1f}bps WoW, {yoy:+d}bps vs one year ago {yago:.2f}%)
+- {obmmi_line}
+- 30Y/10Y spread: {spread_bps}bps ({spread_sig}) — historical norm ~170bps, 2023 peak ~310bps
+- {sales_line}
+- {econ_line}
+- {housing_line}
+
+Write a "1-minute briefing" with exactly these three parts, each on its own line with the label in caps:
+
+THE SIGNAL: One crisp sentence naming the single most important thing happening in the market today (rate direction, spread context, or sales momentum — whichever is most notable).
+
+WHAT IT MEANS: One sentence explaining what this means for a buyer, seller, or agent in plain language. No jargon.
+
+WATCH FOR: One specific forward-looking thing to monitor this week (upcoming data release, rate trigger level, seasonal pattern, etc.).
+
+Be direct and concrete. Use the actual numbers. No preamble, no sign-off. Total length: 3 sentences."""
+
+    print("  Summary: calling Claude API...")
+    try:
+        body = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 300,
+            "messages": [{"role": "user", "content": prompt}]
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": key,
+                "anthropic-version": "2023-06-01",
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        text = data["content"][0]["text"].strip()
+        print(f"  Summary: got {len(text)} chars")
+        return _format_summary_html(text)
+    except Exception as e:
+        print(f"  Summary: API call failed ({e}), using fallback")
+        return _summary_fallback(rates, pmms, spread, pending)
+
+
+def _format_summary_html(text):
+    """Parse Claude's 3-line response into styled HTML."""
+    signal = what = watch = ""
+    for line in text.splitlines():
+        line = line.strip()
+        if line.upper().startswith("THE SIGNAL:"):
+            signal = line[len("THE SIGNAL:"):].strip()
+        elif line.upper().startswith("WHAT IT MEANS:"):
+            what = line[len("WHAT IT MEANS:"):].strip()
+        elif line.upper().startswith("WATCH FOR:"):
+            watch = line[len("WATCH FOR:"):].strip()
+    # Fallback: just split into three chunks if labels weren't found
+    if not signal:
+        parts = [l.strip() for l in text.splitlines() if l.strip()]
+        signal = parts[0] if len(parts) > 0 else text
+        what   = parts[1] if len(parts) > 1 else ""
+        watch  = parts[2] if len(parts) > 2 else ""
+    rows = ""
+    if signal:
+        rows += f'<div class="brief-row"><span class="brief-lbl">The Signal</span><span class="brief-val">{signal}</span></div>'
+    if what:
+        rows += f'<div class="brief-row"><span class="brief-lbl">What It Means</span><span class="brief-val">{what}</span></div>'
+    if watch:
+        rows += f'<div class="brief-row brief-row-last"><span class="brief-lbl">Watch For</span><span class="brief-val">{watch}</span></div>'
+    return rows
+
+
+def _summary_fallback(rates, pmms, spread, pending):
+    """Static fallback when API unavailable."""
+    r30  = pmms.get("rate_30y") or 0
+    p30  = pmms.get("prev_30y") or r30
+    bps  = round((r30 - p30) * 100, 1)
+    dir_ = "up" if bps >= 0 else "down"
+    sp   = spread.get("spread_bps")
+    sp_s = spread.get("signal", "")
+    signal = f"30Y fixed at {r30:.2f}%, {abs(bps):.0f}bps {dir_} week-over-week."
+    what   = f"Spread at {sp}bps ({sp_s}) — {'above' if sp and sp > 200 else 'near'} historical norm of ~170bps." if sp else ""
+    watch  = "Thursday: Freddie Mac PMMS update. Watch for rate direction confirmation."
+    rows = f'<div class="brief-row"><span class="brief-lbl">The Signal</span><span class="brief-val">{signal}</span></div>'
+    if what:
+        rows += f'<div class="brief-row"><span class="brief-lbl">What It Means</span><span class="brief-val">{what}</span></div>'
+    rows += f'<div class="brief-row brief-row-last"><span class="brief-lbl">Watch For</span><span class="brief-val">{watch}</span></div>'
+    return rows
+
+
 # ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
 def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread):
@@ -664,6 +834,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     pending_html_str = build_pending_html(pending)
     fannie_rows_str = build_fannie_rows(housing)
     ticker_str     = build_ticker(rates, pmms, hpsi, spread)
+    summary_html   = build_summary(rates, pmms, spread, pending, housing, economic)
 
     r30   = pmms.get("rate_30y") or 0
     r15   = pmms.get("rate_15y") or 0
@@ -750,6 +921,19 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .header-title{{font-size:.78rem;font-weight:600;color:var(--nz-blue);letter-spacing:.04em;text-transform:uppercase}}
   .hmeta{{font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;line-height:1.7}}
 
+  /* NAV */
+  .nav-wrap{{background:white;border-bottom:1px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.05)}}
+  .nav-inner{{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:.25rem;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}}
+  .nav-inner::-webkit-scrollbar{{display:none}}
+  .nav-link{{font-family:'DM Mono',monospace;font-size:.58rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:.55rem .75rem;white-space:nowrap;border-bottom:2px solid transparent;transition:color .15s,border-color .15s}}
+  .nav-link:hover{{color:var(--nz-blue);border-bottom-color:var(--nz-blue)}}
+
+  /* TOOLTIP */
+  .tip-wrap{{position:relative;display:inline-flex;align-items:center}}
+  .tip-wrap .tip{{display:none;position:absolute;left:50%;bottom:calc(100% + 6px);transform:translateX(-50%);background:var(--ink);color:white;font-family:'DM Mono',monospace;font-size:.56rem;line-height:1.5;padding:.4rem .65rem;border-radius:5px;white-space:nowrap;z-index:200;pointer-events:none}}
+  .tip-wrap .tip::after{{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink)}}
+  .tip-wrap:hover .tip{{display:block}}
+
   /* TICKER */
   .ticker-wrap{{background:var(--nz-blue);overflow:hidden;padding:.38rem 0}}
   .ticker{{display:flex;gap:3rem;animation:scroll 55s linear infinite;width:max-content}}
@@ -770,6 +954,18 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .fed-icon{{font-size:1.5rem;flex-shrink:0;opacity:.85}}
   .fed-note h4{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:.3rem}}
   .fed-note p{{font-size:.75rem;line-height:1.65;color:rgba(255,255,255,.9)}}.fed-note strong{{color:white}}
+
+  /* 1-MIN BRIEFING */
+  .brief-card{{background:white;border:1px solid var(--border);border-radius:10px;margin-bottom:2rem;overflow:hidden;box-shadow:0 1px 6px rgba(76,109,225,.07)}}
+  .brief-head{{background:var(--nz-blue-light);border-bottom:1px solid var(--border);padding:.65rem 1.25rem;display:flex;align-items:center;gap:.75rem}}
+  .brief-head-label{{font-family:'DM Mono',monospace;font-size:.58rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--nz-blue)}}
+  .brief-head-sub{{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted)}}
+  .brief-pulse{{width:8px;height:8px;border-radius:50%;background:var(--nz-blue);flex-shrink:0;animation:pulse 2s ease-in-out infinite}}
+  @keyframes pulse{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.5;transform:scale(.85)}}}}
+  .brief-row{{display:grid;grid-template-columns:110px 1fr;gap:1rem;padding:.75rem 1.25rem;border-bottom:1px solid var(--border);align-items:baseline}}
+  .brief-row-last{{border-bottom:none}}
+  .brief-lbl{{font-family:'DM Mono',monospace;font-size:.54rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--nz-blue);padding-top:.05rem}}
+  .brief-val{{font-size:.78rem;line-height:1.55;color:var(--ink)}}
 
   /* STAT TILES */
   .stat-tiles{{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}}
@@ -889,6 +1085,19 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   </div>
 </div>
 
+<nav class="nav-wrap">
+  <div class="nav-inner">
+    <a class="nav-link" href="#rates">Rates</a>
+    <a class="nav-link" href="#pmms">PMMS</a>
+    <a class="nav-link" href="#spread">Spread</a>
+    <a class="nav-link" href="#home-sales">Home Sales</a>
+    <a class="nav-link" href="#forecast">Forecast</a>
+    <a class="nav-link" href="#industry-news">Industry News</a>
+    <a class="nav-link" href="#housing-news">Housing News</a>
+    <a class="nav-link" href="#outlook">Outlook</a>
+  </div>
+</nav>
+
 <main>
 
   <div class="fed-note">
@@ -897,6 +1106,15 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       <h4>Federal Reserve — Rate Held at 3.50–3.75% · Next Meeting April 28–29, 2026</h4>
       <p>PMMS 30Y at <strong>{r30:.2f}%</strong> as of {pdate} — <strong>{abs(yoy):.0f}bps</strong> {"below" if yoy<=0 else "above"} a year ago ({yago:.2f}%). 10-Year Treasury forecast: <strong>{treasury10y}</strong>. Fannie Mae ESR report: <strong>{fannie_date}</strong>. OBMMI data as of <strong>{obmmi_date}</strong>.</p>
     </div>
+  </div>
+
+  <div class="brief-card">
+    <div class="brief-head">
+      <div class="brief-pulse"></div>
+      <div class="brief-head-label">1-Minute Briefing</div>
+      <div class="brief-head-sub">AI-generated from today's live data · {RUN_TS}</div>
+    </div>
+    {summary_html}
   </div>
 
   <div class="slbl">Key Indicators · {TODAY_STR}</div>
@@ -927,10 +1145,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
-  <div class="slbl">OBMMI Daily Rate Locks · Optimal Blue via FRED API · {obmmi_date}</div>
+  <div class="slbl" id="rates">OBMMI Daily Rate Locks · Optimal Blue via FRED API · {obmmi_date}</div>
   <div class="rate-grid" id="rate-grid"></div>
 
-  <div class="slbl">Full OBMMI Rate Comparison</div>
+  <div class="slbl">Full OBMMI Rate Comparison · {obmmi_date}</div>
   <div class="tbl-wrap">
     <div class="ph"><h3>Optimal Blue Mortgage Market Indices (OBMMI)</h3><span class="badge badge-blue">FRED API · OBMMI</span></div>
     <table>
@@ -940,7 +1158,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     <div class="sb"><div class="sd"></div><span>Optimal Blue OBMMI via FRED API · Actual locked rates from ~35% of US mortgage transactions · Updated nightly</span></div>
   </div>
 
-  <div class="slbl">Freddie Mac PMMS · Via FRED API</div>
+  <div class="slbl" id="pmms">Freddie Mac PMMS · Via FRED API</div>
   <div class="panel" style="margin-bottom:2rem;">
     <div class="ph"><h3>Primary Mortgage Market Survey — Weekly Rates</h3><span class="badge badge-teal">Freddie Mac · FRED</span></div>
     <div class="pmms-strip">
@@ -975,7 +1193,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   <div class="two-col">
     <div>
-      <div class="slbl">Existing Home Sales · NAR via FRED</div>
+      <div class="slbl" id="home-sales">Existing Home Sales · NAR via FRED</div>
       <div class="panel">
         <div class="ph"><h3>Existing Home Sales</h3><span class="badge badge-teal">FRED · NAR</span></div>
         {pending_html_str}
@@ -983,7 +1201,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       </div>
     </div>
     <div>
-      <div class="slbl">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
+      <div class="slbl" id="forecast">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
       <div class="tbl-wrap" style="margin-bottom:0;">
         <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">Fannie Mae API</span></div>
         <table class="ftable">
@@ -995,7 +1213,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
-  <div class="slbl">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
+  <div class="slbl" id="spread">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
   <div class="panel" style="margin-bottom:2rem;">
     <div class="ph"><h3>30Y Mortgage / 10Y Treasury Spread</h3><span class="badge badge-blue">FRED API</span></div>
     <div class="pmms-strip">
@@ -1025,7 +1243,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   <div class="two-col">
     <div>
-      <div class="slbl">Industry News · Inman</div>
+      <div class="slbl" id="industry-news">Industry News · Inman</div>
       <div class="panel">
         <div class="ph"><h3>Inman Real Estate News</h3><span class="badge badge-blue">Inman</span></div>
         {inman_html}
@@ -1033,7 +1251,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       </div>
     </div>
     <div>
-      <div class="slbl">Housing Market News · Mortgage News Daily</div>
+      <div class="slbl" id="housing-news">Housing Market News · Mortgage News Daily</div>
       <div class="panel">
         <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">Mortgage News Daily</span></div>
         {fortune_html}
@@ -1042,7 +1260,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
-  <div class="slbl">Fannie Mae ESR · Economic & Housing Outlook · {fannie_date}</div>
+  <div class="slbl" id="outlook">Fannie Mae ESR · Economic & Housing Outlook · {fannie_date}</div>
   <div class="three-col">
     <div class="panel">
       <div class="ph"><h3>Housing Market Outlook</h3><span class="badge badge-gold">Fannie Mae API</span></div>
@@ -1115,7 +1333,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     PMMS: Freddie Mac via FRED &nbsp;·&nbsp;
     Fannie Mae ESR APIs &nbsp;·&nbsp;
     NAR Existing Home Sales via FRED &nbsp;·&nbsp;
-    Inman &amp; Calculated Risk RSS &nbsp;·&nbsp;
+    Inman &amp; Mortgage News Daily RSS &nbsp;·&nbsp;
     Not financial advice &nbsp;·&nbsp; {RUN_TS}
   </div>
   <div class="footer-logo"><img src="{{LOGO_SRC}}" alt="Newzip"></div>
@@ -1129,10 +1347,11 @@ function renderCard(r) {{
   var dir = u ? 'up' : 'dn';
   var arrow = u ? '\u25b2' : '\u25bc';
   var col = u ? 'var(--nz-red)' : 'var(--nz-teal)';
+  var tipText = (u ? '\u25b2 Rate up ' : '\u25bc Rate down ') + Math.abs(r.bps) + 'bps<br>vs prior business day lock rate<br>Source: Optimal Blue OBMMI \u00b7 FRED';
   return '<div class="rate-card">'
     + '<div class="rc-label">' + r.lb + '</div>'
     + '<div class="rc-value">' + r.rate.toFixed(3) + '%</div>'
-    + '<div class="rc-chg ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + 'bps</div>'
+    + '<div class="tip-wrap"><div class="rc-chg ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + 'bps</div><div class="tip">' + tipText + '</div></div>'
     + '<div class="rc-prev">Prev: ' + r.prev.toFixed(3) + '%</div>'
     + '</div>';
 }}
@@ -1142,12 +1361,14 @@ function renderRow(r) {{
   var dir = u ? 'up' : 'dn';
   var arrow = u ? '\u25b2' : '\u25bc';
   var col = u ? 'var(--nz-red)' : 'var(--nz-teal)';
+  var intensity = Math.abs(r.bps) <= 5 ? 'Minimal move' : Math.abs(r.bps) <= 15 ? 'Moderate move' : 'Large move';
+  var tipText = (u ? '\u25b2 Rate up ' : '\u25bc Rate down ') + Math.abs(r.bps) + 'bps vs prior lock day \u00b7 ' + intensity + '<br>Bar fills fully at 25bps+ \u00b7 Source: Optimal Blue OBMMI \u00b7 FRED';
   return '<tr>'
     + '<td class="td-type">' + r.type + '</td>'
     + '<td class="td-rate">' + r.rate.toFixed(3) + '%</td>'
     + '<td class="td-prev">' + r.prev.toFixed(3) + '%</td>'
     + '<td class="td-bps ' + dir + '">' + arrow + ' ' + Math.abs(r.bps) + '</td>'
-    + '<td><div class="bar-wrap"><div class="bar-fill" style="width:' + bp + '%;background:' + col + '"></div></div></td>'
+    + '<td><div class="tip-wrap"><div class="bar-wrap"><div class="bar-fill" style="width:' + bp + '%;background:' + col + '"></div></div><div class="tip">' + tipText + '</div></div></td>'
     + '</tr>';
 }}
 document.getElementById('rate-grid').innerHTML = RATES.map(renderCard).join('');
@@ -1162,6 +1383,7 @@ if __name__ == "__main__":
     print(f"\n{'='*60}\nNewzip Market Tracker — {RUN_TS}\n{'='*60}\n")
     if not FRED_KEY: print("WARNING: FRED_API_KEY not set\n")
     if not FANNIE_CLIENT_ID or not FANNIE_CLIENT_SECRET: print("WARNING: Fannie Mae creds not set\n")
+    if not ANTHROPIC_API_KEY: print("WARNING: ANTHROPIC_API_KEY not set — summary will use static fallback\n")
 
     rates    = fetch_obmmi()
     pmms     = fetch_pmms()
@@ -1188,3 +1410,4 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
     print(f"{'='*60}\n")
+
