@@ -3,7 +3,7 @@
 PropertyPulse / Newzip Market Tracker — scraper
 Sources: FRED API, Fannie Mae APIs, Inman RSS, Fortune RSS, HousingWire/MBA RSS
 """
-import os, re, json, datetime, urllib.request, urllib.parse
+import os, re, json, datetime, gzip, csv, io, urllib.request, urllib.parse
 
 TODAY     = datetime.date.today()
 TODAY_STR = TODAY.strftime("%B %d, %Y")
@@ -459,6 +459,123 @@ def fetch_fortune_news():
     return articles
 
 
+# ── REDFIN HOUSING MARKET DATA ────────────────────────────────────────────────
+
+def fetch_redfin_market():
+    """
+    Pull national housing market data from Redfin's public S3 data center.
+    URL: redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/
+    File: national_market_tracker.tsv000.gz — updated weekly (Wednesdays).
+    Free to use with citation to Redfin.
+    Key fields: inventory, median_dom, months_of_supply, new_listings,
+                median_sale_price, homes_sold, pct_homes_with_price_drops,
+                avg_sale_to_list, pending_sales
+    """
+    print("Fetching Redfin national housing market data...")
+    url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/national_market_tracker.tsv000.gz"
+    fallback = {
+        "period_begin": "2026-02-01", "period_end": "2026-02-28",
+        "inventory": 1726907, "inventory_yoy": -0.04,
+        "median_dom": 66, "median_dom_yoy": 9,
+        "months_of_supply": 4.0, "months_of_supply_yoy": 0.0,
+        "new_listings": 472951, "new_listings_yoy": -4.8,
+        "median_sale_price": 429189, "median_sale_price_yoy": 0.9,
+        "homes_sold": 318107, "homes_sold_yoy": -3.7,
+        "pct_price_drops": 16.5, "pct_price_drops_yoy": 1.5,
+        "avg_sale_to_list": 98.2, "avg_sale_to_list_yoy": -0.27,
+        "pct_sold_above_list": 22.5, "pct_sold_above_list_yoy": -2.2,
+        "source": "fallback",
+    }
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            raw = gzip.decompress(resp.read())
+        reader = csv.DictReader(io.StringIO(raw.decode("utf-8")), delimiter="\t")
+        rows = list(reader)
+        if not rows:
+            print("  Redfin: empty file, using fallback")
+            return fallback
+        # Last row = most recent period
+        row = rows[-1]
+        def _f(key, divisor=1):
+            try: return round(float(row[key]) / divisor, 2)
+            except: return None
+        result = {
+            "period_begin":        row.get("period_begin", ""),
+            "period_end":          row.get("period_end", ""),
+            "inventory":           _f("inventory"),
+            "inventory_yoy":       _f("inventory_yoy") and round(_f("inventory_yoy") * 100, 1),
+            "median_dom":          _f("median_dom"),
+            "median_dom_yoy":      _f("median_dom_yoy"),
+            "months_of_supply":    _f("months_of_supply"),
+            "months_of_supply_yoy":_f("months_of_supply_yoy"),
+            "new_listings":        _f("new_listings"),
+            "new_listings_yoy":    _f("new_listings_yoy") and round(_f("new_listings_yoy") * 100, 1),
+            "median_sale_price":   _f("median_sale_price"),
+            "median_sale_price_yoy":_f("median_sale_price_yoy") and round(_f("median_sale_price_yoy") * 100, 1),
+            "homes_sold":          _f("homes_sold"),
+            "homes_sold_yoy":      _f("homes_sold_yoy") and round(_f("homes_sold_yoy") * 100, 1),
+            "pct_price_drops":     _f("pct_homes_with_price_drops") and round(_f("pct_homes_with_price_drops") * 100, 1),
+            "pct_price_drops_yoy": _f("pct_homes_with_price_drops_yoy") and round(_f("pct_homes_with_price_drops_yoy") * 100, 1),
+            "avg_sale_to_list":    _f("avg_sale_to_list") and round(_f("avg_sale_to_list") * 100, 1),
+            "pct_sold_above_list": _f("pct_homes_sold_above_list") and round(_f("pct_homes_sold_above_list") * 100, 1),
+            "source": "redfin",
+        }
+        print(f"  Redfin: {result['period_begin']} → {result['period_end']} | inventory {result['inventory']} | DOM {result['median_dom']}d | supply {result['months_of_supply']}mo")
+        return result
+    except Exception as e:
+        print(f"  Redfin: fetch failed ({e}), using Feb 2026 fallback")
+        return fallback
+
+
+def fetch_zillow_market():
+    """
+    Pull Zillow Home Value Index (ZHVI) — national typical home value.
+    File: files.zillowstatic.com/research/public_csvs/zhvi/
+    National level: filter rows where RegionName == "United States".
+    Updated monthly on the 16th.
+    """
+    print("Fetching Zillow ZHVI national home value...")
+    # National-level ZHVI all-home types smoothed seasonally adjusted
+    url = "https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+    fallback = {
+        "zhvi": 359000, "zhvi_mom": 0.3, "zhvi_yoy": 3.2,
+        "period": "2026-01", "source": "fallback",
+    }
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            raw = resp.read().decode("utf-8")
+        reader = csv.DictReader(io.StringIO(raw))
+        national_row = None
+        for row in reader:
+            if row.get("RegionName", "").lower() == "united states":
+                national_row = row
+                break
+        if not national_row:
+            print("  Zillow: United States row not found, using fallback")
+            return fallback
+        # Get last two date columns for MoM, and ~12 months ago for YoY
+        date_cols = [k for k in national_row.keys() if re.match(r'\d{4}-\d{2}-\d{2}', k)]
+        date_cols.sort()
+        if len(date_cols) < 13:
+            return fallback
+        latest_col  = date_cols[-1]
+        prev_col    = date_cols[-2]
+        yago_col    = date_cols[-13]
+        v_now  = float(national_row[latest_col])
+        v_prev = float(national_row[prev_col])
+        v_yago = float(national_row[yago_col])
+        mom = round((v_now - v_prev) / v_prev * 100, 2)
+        yoy = round((v_now - v_yago) / v_yago * 100, 1)
+        period = latest_col[:7]
+        print(f"  Zillow ZHVI: ${v_now:,.0f} ({mom:+.2f}% MoM, {yoy:+.1f}% YoY) as of {period}")
+        return {"zhvi": round(v_now), "zhvi_mom": mom, "zhvi_yoy": yoy, "period": period, "source": "zillow"}
+    except Exception as e:
+        print(f"  Zillow: fetch failed ({e}), using fallback")
+        return fallback
+
+
 def fetch_pending():
     """
     Fetch NAR Existing Home Sales via FRED.
@@ -516,6 +633,115 @@ def fetch_pending():
         "date":    date_str,
         "history": [{"val": round(o["val"] / 1_000_000, 2), "date": o["date"]} for o in valid[:6]],
     }
+
+
+# ── HOUSING MARKET PULSE BUILDER ──────────────────────────────────────────────
+
+def build_housing_pulse_html(redfin, zillow):
+    """
+    Render the Housing Market Pulse panel from Redfin + Zillow data.
+    Returns an HTML string for the pulse-grid div.
+    """
+    def _yoy_badge(val, invert=False):
+        """Return a styled badge for YoY change. invert=True means up is bad (e.g. DOM)."""
+        if val is None: return '<span class="hp-badge hp-neu">N/A</span>'
+        good = (val < 0) if invert else (val > 0)
+        cls  = "hp-good" if good else ("hp-bad" if not good else "hp-neu")
+        sign = "+" if val > 0 else ""
+        return f'<span class="hp-badge {cls}">{sign}{val:g}% YoY</span>'
+
+    def _dom_badge(val, yoy):
+        if val is None: return '<span class="hp-badge hp-neu">N/A</span>'
+        good = yoy is not None and yoy < 0
+        cls  = "hp-good" if good else "hp-bad"
+        sign = "+" if (yoy or 0) > 0 else ""
+        suffix = f' ({sign}{yoy:g}d YoY)' if yoy is not None else ""
+        return f'<span class="hp-badge {cls}">{int(val)}d{suffix}</span>'
+
+    # Market signal: months of supply determines buyer vs seller
+    supply = redfin.get("months_of_supply") or 4.0
+    if supply < 3:
+        signal_label, signal_cls, signal_desc = "Seller's Market", "hp-signal-hot", "Under 3 months supply — sellers have pricing power"
+    elif supply < 5:
+        signal_label, signal_cls, signal_desc = "Balanced Market", "hp-signal-balanced", f"{supply:.1f} months supply — roughly balanced conditions"
+    else:
+        signal_label, signal_cls, signal_desc = "Buyer's Market", "hp-signal-cool", f"{supply:.1f} months supply — buyers have negotiating room"
+
+    inv       = redfin.get("inventory")
+    inv_yoy   = redfin.get("inventory_yoy")
+    dom       = redfin.get("median_dom")
+    dom_yoy   = redfin.get("median_dom_yoy")
+    price     = redfin.get("median_sale_price")
+    price_yoy = redfin.get("median_sale_price_yoy")
+    drops     = redfin.get("pct_price_drops")
+    drops_yoy = redfin.get("pct_price_drops_yoy")
+    nl        = redfin.get("new_listings")
+    nl_yoy    = redfin.get("new_listings_yoy")
+    stl       = redfin.get("avg_sale_to_list")
+    sold_above= redfin.get("pct_sold_above_list")
+    period    = redfin.get("period_end", "")
+    try:
+        pd_str = datetime.datetime.strptime(period, "%Y-%m-%d").strftime("%b %Y")
+    except:
+        pd_str = period or "Latest"
+
+    zhvi      = zillow.get("zhvi")
+    zhvi_yoy  = zillow.get("zhvi_yoy")
+    zhvi_mom  = zillow.get("zhvi_mom")
+    zhvi_per  = zillow.get("period", "")
+
+    price_str = f"${price:,.0f}" if price else (f"${zhvi:,.0f} (ZHVI)" if zhvi else "N/A")
+    price_yoy_val = price_yoy if price_yoy is not None else zhvi_yoy
+
+    return f"""
+    <div class="hp-signal {signal_cls}">
+      <div class="hp-signal-label">{signal_label}</div>
+      <div class="hp-signal-desc">{signal_desc}</div>
+    </div>
+    <div class="hp-grid">
+      <div class="hp-cell">
+        <div class="hp-metric">Median Home Price</div>
+        <div class="hp-val">{price_str}</div>
+        {_yoy_badge(price_yoy_val)}
+      </div>
+      <div class="hp-cell">
+        <div class="hp-metric">Active Inventory</div>
+        <div class="hp-val">{f"{inv:,.0f}" if inv else "N/A"}</div>
+        {_yoy_badge(inv_yoy)}
+      </div>
+      <div class="hp-cell">
+        <div class="hp-metric">Median Days on Market</div>
+        <div class="hp-val">{int(dom) if dom else "N/A"} days</div>
+        {_dom_badge(dom, dom_yoy)}
+      </div>
+      <div class="hp-cell">
+        <div class="hp-metric">Months of Supply</div>
+        <div class="hp-val">{supply:.1f} mo</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:.2rem">&lt;3 seller · 3–5 balanced · 5+ buyer</div>
+      </div>
+      <div class="hp-cell">
+        <div class="hp-metric">New Listings</div>
+        <div class="hp-val">{f"{nl:,.0f}" if nl else "N/A"}</div>
+        {_yoy_badge(nl_yoy)}
+      </div>
+      <div class="hp-cell">
+        <div class="hp-metric">Homes w/ Price Drops</div>
+        <div class="hp-val">{f"{drops:.1f}%" if drops else "N/A"}</div>
+        {_yoy_badge(drops_yoy, invert=True) if drops_yoy else '<span class="hp-badge hp-neu">N/A</span>'}
+      </div>
+      <div class="hp-cell">
+        <div class="hp-metric">Sale-to-List Ratio</div>
+        <div class="hp-val">{f"{stl:.1f}%" if stl else "N/A"}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:.2rem">100% = full price · &gt;100% = bidding wars</div>
+      </div>
+      <div class="hp-cell">
+        <div class="hp-metric">Sold Above List</div>
+        <div class="hp-val">{f"{sold_above:.1f}%" if sold_above else "N/A"}</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:.2rem">Share of homes sold over ask</div>
+      </div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>Redfin Data Center · redfin.com/news/data-center · {pd_str} · Updated weekly Wednesdays · Cite Redfin when sharing</span></div>
+"""
 
 
 def build_news_items(articles, show_desc=False):
@@ -840,13 +1066,16 @@ def _summary_fallback(rates, pmms, spread, pending):
 
 # ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
-def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread):
+def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread, redfin_market=None, zillow_market=None):
     rates_json     = json.dumps(rates)
     fortune_html   = build_news_items(news_fortune)
     inman_html     = build_news_items(news_inman, show_desc=True)
     pending_html_str = build_pending_html(pending)
     fannie_rows_str = build_fannie_rows(housing)
     summary_html   = build_summary(rates, pmms, spread, pending, housing, economic)
+    redfin_market  = redfin_market or {}
+    zillow_market  = zillow_market or {}
+    pulse_html     = build_housing_pulse_html(redfin_market, zillow_market)
 
     r30   = pmms.get("rate_30y") or 0
     r15   = pmms.get("rate_15y") or 0
@@ -978,6 +1207,26 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .brief-row:first-child .brief-lbl{{color:rgba(255,255,255,.9);letter-spacing:.1em}}
   .brief-val{{font-size:.8rem;line-height:1.6;color:rgba(255,255,255,.82)}}
 
+  /* HOUSING PULSE */
+  .hp-signal{{border-radius:8px;padding:.85rem 1.25rem;margin:.75rem 1.25rem;}}
+  .hp-signal-hot{{background:#FDF3E7;border-left:4px solid var(--gold)}}
+  .hp-signal-balanced{{background:var(--nz-teal-light);border-left:4px solid var(--nz-teal)}}
+  .hp-signal-cool{{background:var(--nz-blue-light);border-left:4px solid var(--nz-blue)}}
+  .hp-signal-label{{font-family:'DM Mono',monospace;font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.2rem}}
+  .hp-signal-hot .hp-signal-label{{color:var(--gold)}}
+  .hp-signal-balanced .hp-signal-label{{color:var(--nz-teal)}}
+  .hp-signal-cool .hp-signal-label{{color:var(--nz-blue)}}
+  .hp-signal-desc{{font-size:.72rem;color:var(--ink);line-height:1.5}}
+  .hp-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin:0 0 0 0}}
+  @media(max-width:700px){{.hp-grid{{grid-template-columns:repeat(2,1fr)}}}}
+  .hp-cell{{background:white;padding:.85rem 1.25rem}}
+  .hp-metric{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}}
+  .hp-val{{font-size:1.05rem;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:.3rem}}
+  .hp-badge{{font-family:'DM Mono',monospace;font-size:.54rem;padding:.15rem .45rem;border-radius:4px;font-weight:500}}
+  .hp-good{{background:var(--nz-teal-light);color:var(--nz-teal)}}
+  .hp-bad{{background:var(--nz-red-light);color:var(--nz-red)}}
+  .hp-neu{{background:var(--paper2);color:var(--muted)}}
+
   /* STAT TILES */
   .stat-tiles{{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}}
   @media(max-width:700px){{.stat-tiles{{grid-template-columns:repeat(2,1fr)}}}}
@@ -1081,6 +1330,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       <div class="header-title">Market Tracker</div>
     </div>
     <nav class="nav-inner">
+      <a class="nav-link" href="#housing-pulse">Housing Pulse</a>
       <a class="nav-link" href="#rates">Rates</a>
       <a class="nav-link" href="#pmms">PMMS</a>
       <a class="nav-link" href="#spread">Spread</a>
@@ -1107,6 +1357,12 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       <h4>Federal Reserve — Rate Held at 3.50–3.75% · Next Meeting April 28–29, 2026</h4>
       <p>PMMS 30Y at <strong>{r30:.2f}%</strong> as of {pdate} — <strong>{abs(yoy):.0f}bps</strong> {"below" if yoy<=0 else "above"} a year ago ({yago:.2f}%). 10-Year Treasury forecast: <strong>{treasury10y}</strong>. Fannie Mae ESR report: <strong>{fannie_date}</strong>. OBMMI data as of <strong>{obmmi_date}</strong>.</p>
     </div>
+  </div>
+
+  <div class="slbl" id="housing-pulse">Housing Market Pulse · Redfin &amp; Zillow Data</div>
+  <div class="panel" style="margin-bottom:2rem;overflow:hidden;padding:0;">
+    <div class="ph"><h3>National Housing Market Conditions</h3><span class="badge badge-teal">Redfin · Zillow</span></div>
+    {pulse_html}
   </div>
 
   <div class="brief-card">
@@ -1336,6 +1592,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     PMMS: Freddie Mac via FRED &nbsp;·&nbsp;
     Fannie Mae ESR APIs &nbsp;·&nbsp;
     NAR Existing Home Sales via FRED &nbsp;·&nbsp;
+    Redfin &amp; Zillow Housing Market Data &nbsp;·&nbsp;
     Inman &amp; Mortgage News Daily RSS &nbsp;·&nbsp;
     Not financial advice &nbsp;·&nbsp; {RUN_TS}
   </div>
@@ -1398,8 +1655,11 @@ if __name__ == "__main__":
     news_fortune = fetch_fortune_news()
     news_inman   = fetch_inman_news()
     pending      = fetch_pending()
+    redfin_market = fetch_redfin_market()
+    zillow_market = fetch_zillow_market()
 
-    html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread)
+    html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread,
+                      redfin_market=redfin_market, zillow_market=zillow_market)
     html = html.replace("{LOGO_SRC}", LOGO_SRC)
 
     with open("index.html","w",encoding="utf-8") as f:
@@ -1413,5 +1673,6 @@ if __name__ == "__main__":
     print(f"  Fortune news : {len(news_fortune)} articles")
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
+    print(f"  Redfin market: DOM {redfin_market.get('median_dom')}d · supply {redfin_market.get('months_of_supply')}mo · inv {redfin_market.get('inventory')}")
+    print(f"  Zillow ZHVI  : ${zillow_market.get('zhvi'):,} ({zillow_market.get('zhvi_yoy'):+}% YoY)")
     print(f"{'='*60}\n")
-
