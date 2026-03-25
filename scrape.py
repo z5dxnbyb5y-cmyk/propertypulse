@@ -370,26 +370,17 @@ def fetch_fortune_news():
 def fetch_mba():
     """
     Fetch MBA Weekly Purchase Applications data.
-    Source: Calculated Risk Blog RSS (calculatedriskblog.com/feeds/posts/default)
-      - Publishes full MBA Weekly Survey text every Wednesday
-      - We extract the PURCHASE INDEX specifically (not composite, not refi, not HPSI)
-      - The seasonally adjusted Purchase Index is the correct metric for buyer demand
-    Fallback: Inman RSS (title-only, less precise)
+
+    Source priority:
+      1. MBA.org newsroom — official press releases, published every Wednesday,
+         freely accessible, full Purchase Index text with exact figures.
+      2. Calculated Risk Blog RSS — re-publishes MBA data with full body text
+      3. Inman RSS — headline only (last resort for link display)
     """
     print("Fetching MBA Purchase Application data...")
     weeks, items = [], []
 
     def extract_purchase_pct(text):
-        """
-        Extract WoW % change for the MBA Purchase Index specifically.
-        The MBA report always phrases it as:
-          "The seasonally adjusted Purchase Index increased/decreased X percent from one week earlier"
-        We target this exact phrase to avoid confusing it with:
-          - The composite Market Composite Index (total apps incl. refi)
-          - The Refinance Index
-          - Consumer sentiment (HPSI) — completely separate survey, not in this feed
-        """
-        # Primary: seasonally adjusted Purchase Index (most reliable, matches HousingWire display)
         m = re.search(
             r"seasonally adjusted Purchase Index (increased|decreased)\s+([\d.]+)\s*percent",
             text, re.I
@@ -397,8 +388,6 @@ def fetch_mba():
         if m:
             val = float(m.group(2))
             return -val if m.group(1).lower() == "decreased" else val
-
-        # Secondary: unadjusted Purchase Index (less preferred but still purchase-specific)
         m = re.search(
             r"unadjusted Purchase Index (increased|decreased)\s+([\d.]+)\s*percent",
             text, re.I
@@ -406,11 +395,9 @@ def fetch_mba():
         if m:
             val = float(m.group(2))
             return -val if m.group(1).lower() == "decreased" else val
-
-        return None  # Do NOT fall back to composite/title — would be wrong index
+        return None
 
     def extract_yoy_pct(text):
-        """Extract YoY % for Purchase Index (unadjusted, same week last year comparison)."""
         m = re.search(
             r"unadjusted Purchase Index.*?was\s+([\d.]+)\s*percent (higher|lower) than the same week one year",
             text, re.I
@@ -421,89 +408,140 @@ def fetch_mba():
         return None
 
     def extract_week_ending(text):
-        """Extract week-ending date from MBA report text."""
         m = re.search(r"week ending\s+(\w+ \d+,?\s*\d{4})", text, re.I)
         return m.group(1).strip() if m else ""
 
-    def parse_rss(raw, domain=None):
-        found = []
-        # Capture item blocks including description/content
+    # ── PRIMARY: MBA.org newsroom ──────────────────────────────────────────────
+    print("  Trying MBA.org newsroom...")
+    newsroom_html = fetch("https://www.mba.org/news-and-research/newsroom/news", timeout=25)
+    if newsroom_html:
+        pr_links = []
         for m in re.finditer(
-            r"<item>(.*?)</item>", raw, re.DOTALL | re.IGNORECASE
+            r'href="(/news-and-research/newsroom/news/\d{4}/\d{2}/\d{2}/mortgage-applications[^"]*)"'
+            , newsroom_html, re.I
         ):
-            block = m.group(1)
+            url = "https://www.mba.org" + m.group(1)
+            if url not in pr_links:
+                pr_links.append(url)
+        print(f"  MBA newsroom: found {len(pr_links)} application press release links")
 
-            title_m = re.search(r"<title>(.*?)</title>", block, re.DOTALL)
-            link_m  = re.search(r"<link>(.*?)</link>",   block, re.DOTALL)
-            pub_m   = re.search(r"<pubDate>(.*?)</pubDate>", block, re.DOTALL)
-            desc_m  = re.search(
-                r"(?:<description>|<content:encoded>)(.*?)(?:</description>|</content:encoded>)",
-                block, re.DOTALL | re.IGNORECASE
-            )
+        for pr_url in pr_links[:3]:
+            pr_html = fetch(pr_url, timeout=25)
+            if not pr_html:
+                continue
+            text = re.sub(r"<[^>]+>", " ", pr_html)
+            text = re.sub(r"\s+", " ", text)
 
-            if not (title_m and link_m): continue
+            purchase_val = extract_purchase_pct(text)
+            yoy_val      = extract_yoy_pct(text)
+            week_end     = extract_week_ending(text)
 
-            title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"", title_m.group(1)).strip()
-            title = re.sub(r"<[^>]+>", "", title).strip()
-            url   = link_m.group(1).strip()
-            pub   = pub_m.group(1).strip() if pub_m else ""
+            title_m = re.search(r"<title>(.*?)</title>", pr_html, re.I | re.DOTALL)
+            h1_m    = re.search(r"<h1[^>]*>(.*?)</h1>", pr_html, re.I | re.DOTALL)
+            raw_title = h1_m or title_m
+            title = ""
+            if raw_title:
+                title = re.sub(r"<[^>]+>", "", raw_title.group(1)).strip()
+                title = re.sub(r"\s+", " ", title)
+                title = re.sub(r"\s*[|\-\u2013]\s*MBA.*$", "", title).strip()
 
-            if domain and domain not in url: continue
-            # Must be an MBA applications post (not HPSI, not builder survey, not refi-only)
-            tl = title.lower()
-            if "mba" not in tl and "application" not in tl: continue
-            if "hpsi" in tl or "sentiment" in tl or "builder" in tl: continue
+            date_m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", pr_url)
+            date_str = ""
+            if date_m:
+                try:
+                    dt = datetime.date(int(date_m.group(1)), int(date_m.group(2)), int(date_m.group(3)))
+                    date_str = dt.strftime("%b %d, %Y")
+                except: pass
 
-            try:
-                dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
-                date_str = dt.strftime("%b %d, %Y")
-            except:
-                date_str = pub[:16]
+            if not title:
+                title = "MBA Weekly Mortgage Applications Survey"
 
-            # Get the body text to extract Purchase Index specifically
-            body = ""
-            if desc_m:
-                body = re.sub(r"<[^>]+>", " ", desc_m.group(1)).strip()
-                body = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"", body)
-
-            purchase_val = extract_purchase_pct(body)
-            yoy_val      = extract_yoy_pct(body)
-            week_end     = extract_week_ending(body)
-
-            found.append({
+            entry = {
                 "title":    title,
-                "url":      url,
+                "url":      pr_url,
                 "date":     date_str,
-                "val":      purchase_val,   # seasonally adj. Purchase Index WoW %
-                "yoy":      yoy_val,        # YoY % (unadjusted purchase)
+                "val":      purchase_val,
+                "yoy":      yoy_val,
                 "week_end": week_end,
-            })
-        return found
+            }
+            items.append(entry)
+            if purchase_val is not None:
+                weeks.append(entry)
+                print(f"  MBA.org PR: Purchase Index {purchase_val:+.1f}% WoW ({week_end})")
 
-    # Primary: Calculated Risk Blog RSS
-    raw = fetch("https://www.calculatedriskblog.com/feeds/posts/default")
-    if raw:
-        found = parse_rss(raw, "calculatedriskblog.com")
-        for f in found:
-            items.append(f)
-            if f["val"] is not None:
-                weeks.append(f)
-        print(f"  Calculated Risk: {len(found)} MBA posts, {len(weeks)} with purchase val")
+        if items:
+            print(f"  MBA.org: {len(items)} press releases, {len(weeks)} with purchase val")
 
-    # Fallback: Inman (titles only — no body, so purchase val will always be None here)
+    # ── FALLBACK 1: Calculated Risk Blog RSS ───────────────────────────────────
     if not items:
+        print("  Falling back to Calculated Risk Blog RSS...")
+        raw = fetch("https://www.calculatedriskblog.com/feeds/posts/default")
+        if raw:
+            for block_m in re.finditer(r"<item>(.*?)</item>", raw, re.DOTALL | re.IGNORECASE):
+                block = block_m.group(1)
+                title_m = re.search(r"<title>(.*?)</title>", block, re.DOTALL)
+                link_m  = re.search(r"<link>(.*?)</link>",   block, re.DOTALL)
+                pub_m   = re.search(r"<pubDate>(.*?)</pubDate>", block, re.DOTALL)
+                desc_m  = re.search(
+                    r"(?:<description>|<content:encoded>)(.*?)(?:</description>|</content:encoded>)",
+                    block, re.DOTALL | re.IGNORECASE
+                )
+                if not (title_m and link_m): continue
+                title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", title_m.group(1)).strip()
+                title = re.sub(r"<[^>]+>", "", title).strip()
+                url   = link_m.group(1).strip()
+                pub   = pub_m.group(1).strip() if pub_m else ""
+                if "calculatedriskblog.com" not in url: continue
+                tl = title.lower()
+                if "mba" not in tl and "application" not in tl: continue
+                if "hpsi" in tl or "sentiment" in tl or "builder" in tl: continue
+                try:
+                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+                    date_str = dt.strftime("%b %d, %Y")
+                except: date_str = pub[:16]
+                body = ""
+                if desc_m:
+                    body = re.sub(r"<[^>]+>", " ", desc_m.group(1))
+                    body = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", body)
+                purchase_val = extract_purchase_pct(body)
+                yoy_val      = extract_yoy_pct(body)
+                week_end     = extract_week_ending(body)
+                entry = {"title": title, "url": url, "date": date_str,
+                         "val": purchase_val, "yoy": yoy_val, "week_end": week_end}
+                items.append(entry)
+                if purchase_val is not None:
+                    weeks.append(entry)
+                if len(items) >= 3: break
+            print(f"  Calculated Risk: {len(items)} MBA posts, {len(weeks)} with purchase val")
+
+    # ── FALLBACK 2: Inman headlines only ──────────────────────────────────────
+    if not items:
+        print("  Falling back to Inman RSS (headline-only)...")
         raw = fetch("https://feeds.feedburner.com/inmannews")
         if raw:
-            for f in parse_rss(raw):
-                items.append(f)
-                if f["val"] is not None:
-                    weeks.append(f)
+            for block_m in re.finditer(r"<item>(.*?)</item>", raw, re.DOTALL | re.IGNORECASE):
+                block = block_m.group(1)
+                title_m = re.search(r"<title>(.*?)</title>", block, re.DOTALL)
+                link_m  = re.search(r"<link>(.*?)</link>",   block, re.DOTALL)
+                pub_m   = re.search(r"<pubDate>(.*?)</pubDate>", block, re.DOTALL)
+                if not (title_m and link_m): continue
+                title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", title_m.group(1)).strip()
+                title = re.sub(r"<[^>]+>", "", title).strip()
+                url   = link_m.group(1).strip()
+                pub   = pub_m.group(1).strip() if pub_m else ""
+                tl = title.lower()
+                if "mba" not in tl and "application" not in tl: continue
+                try:
+                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+                    date_str = dt.strftime("%b %d, %Y")
+                except: date_str = pub[:16]
+                items.append({"title": title, "url": url, "date": date_str,
+                               "val": None, "yoy": None, "week_end": ""})
+                if len(items) >= 3: break
             print(f"  Inman fallback: {len(items)} items")
 
-    print(f"  MBA purchase index: {len(weeks)} with values, {len(items)} items total")
+    print(f"  MBA final: {len(weeks)} with values, {len(items)} items total")
     return {"weeks": weeks[:3], "items": items[:3]}
-
-
 def build_news_items(articles, show_desc=False):
     if not articles:
         return '<div style="padding:1rem;color:var(--muted);font-size:.75rem;">No articles available.</div>'
@@ -552,27 +590,55 @@ def build_mba_html(mba):
 
 def build_fannie_rows(housing):
     year = TODAY.year
-    rates = housing.get("mortgage_rate_30y",{})
+    rates = housing.get("mortgage_rate_30y", {})
+    has_live = bool(rates)
+
+    # Fannie Mae March 2026 ESR published forecast — used when API auth is unavailable.
+    # Source: Fannie Mae Economic & Strategic Research Group, March 2026 Housing Forecast
+    # Update these values each month once the ESR PDF is released.
+    ESR_FALLBACK = {
+        f"Q1 {year}":       6.60,
+        f"Q2 {year}":       6.50,
+        f"Q3 {year}":       6.40,
+        f"Q4 {year}":       6.30,
+        f"EOY {year+1}":    6.10,
+    }
+
     quarters = [
-        (f"Q1 {year}", f"Q1 {year}"),
-        (f"Q2 {year}", f"Q2 {year}"),
-        (f"Q3 {year}", f"Q3 {year}"),
-        (f"Q4 {year}", f"Q4 {year}"),
+        (f"Q1 {year}",    f"Q1 {year}"),
+        (f"Q2 {year}",    f"Q2 {year}"),
+        (f"Q3 {year}",    f"Q3 {year}"),
+        (f"Q4 {year}",    f"Q4 {year}"),
         (f"EOY {year+1}", f"Full Year {year+1}"),
     ]
     rows = ""
-    for key,label in quarters:
-        val = rates.get(key)
+    for key, label in quarters:
+        live_val = rates.get(key)
+        val      = live_val if live_val else ESR_FALLBACK.get(key)
         if val:
-            cls = "fc-good" if val < 6.0 else ""
-            tag = "fc-tag-teal" if val < 6.0 else "fc-tag-neutral"
-            sig = "Sub-6%" if val < 6.0 else "Above 6%"
-            rows += (f'\n<tr><td class="td-type">{label}</td><td class="fc {cls}">{val:.2f}%</td>'
-                     f'<td class="fc fc-neu">Live · Fannie Mae API</td>'
-                     f'<td><span class="fc-tag {tag}">{sig}</span></td></tr>')
+            cls = "fc-good" if val < 6.5 else ""
+            tag = "fc-tag-teal" if val < 6.5 else "fc-tag-neutral"
+            sig = "Below 6.5%" if val < 6.5 else "Above 6.5%"
+            if live_val:
+                src = "Live · Fannie Mae API"
+                badge_cls = "fc-tag-teal"
+            else:
+                src = "Est. · Fannie Mae Mar 2026 ESR"
+                badge_cls = "fc-tag-neutral"
+                sig = "Est."
+            rows += (
+                f'\n<tr><td class="td-type">{label}</td>'
+                f'<td class="fc {cls}">{val:.2f}%</td>'
+                f'<td class="fc fc-neu" style="font-size:.62rem;">{src}</td>'
+                f'<td><span class="fc-tag {badge_cls}">{sig}</span></td></tr>'
+            )
         else:
-            rows += (f'\n<tr><td class="td-type">{label}</td><td class="fc fc-neu">—</td>'
-                     f'<td class="fc fc-neu">—</td><td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr>')
+            rows += (
+                f'\n<tr><td class="td-type">{label}</td>'
+                f'<td class="fc fc-neu">—</td>'
+                f'<td class="fc fc-neu">—</td>'
+                f'<td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr>'
+            )
     return rows
 
 def build_ticker(rates, pmms, hpsi):
@@ -923,9 +989,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
     <div>
       <div class="slbl">MBA Application Activity · HousingWire / MBA</div>
       <div class="panel">
-        <div class="ph"><h3>MBA Mortgage Applications</h3><span class="badge badge-blue">MBA via Calculated Risk</span></div>
+        <div class="ph"><h3>MBA Mortgage Applications</h3><span class="badge badge-blue">MBA via mba.org</span></div>
         <div class="mba-section">{mba_html_str}</div>
-        <div class="sb"><div class="sd"></div><span>MBA Weekly Applications Survey via Calculated Risk Blog · calculatedriskblog.com · Updated Wednesdays</span></div>
+        <div class="sb"><div class="sd"></div><span>MBA Weekly Applications Survey · mba.org newsroom · Updated Wednesdays · Calculated Risk Blog fallback</span></div>
       </div>
     </div>
     <div>
@@ -936,7 +1002,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
           <thead><tr><th>Period</th><th>Forecast</th><th>Source</th><th>Signal</th></tr></thead>
           <tbody>{fannie_rows_str}</tbody>
         </table>
-        <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Auto-updated monthly</span></div>
+        <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Est. values from Mar 2026 ESR when API unavailable · Auto-updated monthly</span></div>
       </div>
     </div>
   </div>
@@ -1032,7 +1098,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
     OBMMI: Optimal Blue via FRED &nbsp;·&nbsp;
     PMMS: Freddie Mac via FRED &nbsp;·&nbsp;
     Fannie Mae ESR APIs &nbsp;·&nbsp;
-    MBA via HousingWire &nbsp;·&nbsp;
+    MBA via mba.org newsroom &nbsp;·&nbsp;
     Inman &amp; Fortune RSS &nbsp;·&nbsp;
     Not financial advice &nbsp;·&nbsp; {RUN_TS}
   </div>
