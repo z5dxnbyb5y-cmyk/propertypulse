@@ -1229,6 +1229,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   /* LAYOUT */
   main{{max-width:1280px;margin:0 auto;padding:1.75rem 1.5rem}}
+  .section-hd{{display:flex;align-items:center;gap:1rem;margin:2.5rem 0 1.25rem;padding-bottom:.65rem;border-bottom:2px solid var(--border)}}
+  .section-hd-label{{font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;color:var(--ink);letter-spacing:.01em}}
+  .section-hd::before{{content:'';display:block;width:4px;height:1.1rem;background:linear-gradient(180deg,#4C6DE1,#005E53);border-radius:2px;flex-shrink:0}}
   .slbl{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}}
   .slbl::after{{content:'';flex:1;height:1px;background:var(--border)}}
   .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}}
@@ -1242,19 +1245,19 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .fed-note p{{font-size:.75rem;line-height:1.65;color:rgba(255,255,255,.9)}}.fed-note strong{{color:white}}
 
   /* 1-MIN BRIEFING */
-  .brief-card{{background:linear-gradient(135deg,#4C6DE1 0%,#005E53 100%);border-radius:12px;margin-bottom:2rem;overflow:hidden;box-shadow:0 4px 28px rgba(76,109,225,.25)}}
-  .brief-head{{padding:1.1rem 1.5rem .6rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid rgba(255,255,255,.12)}}
-  .brief-head-label{{font-family:'DM Mono',monospace;font-size:.62rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.65)}}
-  .brief-head-sub{{font-family:'DM Mono',monospace;font-size:.52rem;color:rgba(255,255,255,.4);margin-left:auto}}
+  .brief-card{{background:linear-gradient(135deg,#4C6DE1 0%,#005E53 100%);border-radius:14px;margin-bottom:2rem;overflow:hidden;box-shadow:0 6px 32px rgba(76,109,225,.28);max-width:900px;margin-left:auto;margin-right:auto}}
+  .brief-head{{padding:1rem 2rem .75rem;display:flex;align-items:center;gap:.75rem;border-bottom:1px solid rgba(255,255,255,.12)}}
+  .brief-head-label{{font-family:'Inter',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.6)}}
+  .brief-head-sub{{font-family:'DM Mono',monospace;font-size:.52rem;color:rgba(255,255,255,.35);margin-left:auto}}
   .brief-pulse{{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.85);flex-shrink:0;animation:pulse 2s ease-in-out infinite}}
-  @keyframes pulse{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.4;transform:scale(.8)}}}}
-  .brief-body{{padding:.25rem 0 .5rem}}
-  .brief-row{{display:grid;grid-template-columns:120px 1fr;gap:1.25rem;padding:.9rem 1.5rem;border-bottom:1px solid rgba(255,255,255,.1);align-items:start}}
+  @keyframes pulse{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.3;transform:scale(.8)}}}}
+  .brief-body{{padding:.5rem 0 1rem}}
+  .brief-row{{display:grid;grid-template-columns:150px 1fr;gap:1.75rem;padding:1.1rem 2rem;border-bottom:1px solid rgba(255,255,255,.08);align-items:baseline}}
   .brief-row-last{{border-bottom:none}}
-  .brief-row:first-child .brief-val{{font-size:1rem;font-weight:600;color:white;line-height:1.4}}
-  .brief-lbl{{font-family:'DM Mono',monospace;font-size:.54rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);padding-top:.2rem}}
-  .brief-row:first-child .brief-lbl{{color:rgba(255,255,255,.9);letter-spacing:.1em}}
-  .brief-val{{font-size:.8rem;line-height:1.6;color:rgba(255,255,255,.82)}}
+  .brief-lbl{{font-family:'Inter',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);line-height:1.4}}
+  .brief-row:first-child .brief-lbl{{color:rgba(255,255,255,.85)}}
+  .brief-row:first-child .brief-val{{font-size:1.15rem;font-weight:600;color:white;line-height:1.45;font-family:'Inter',sans-serif}}
+  .brief-val{{font-family:'Inter',sans-serif;font-size:.88rem;line-height:1.65;color:rgba(255,255,255,.82)}}
 
   /* HOUSING PULSE */
   .hp-signal{{border-radius:8px;padding:.85rem 1.25rem;margin:.75rem 1.25rem;}}
@@ -1379,15 +1382,15 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       <div class="header-title">Market Tracker</div>
     </div>
     <nav class="nav-inner">
+      <a class="nav-link" href="#real-estate">RE Market</a>
       <a class="nav-link" href="#housing-pulse">Housing Pulse</a>
-      <a class="nav-link" href="#rates">Rates</a>
+      <a class="nav-link" href="#home-sales">Home Sales</a>
+      <a class="nav-link" href="#mortgage-insights">Mortgage</a>
+      <a class="nav-link" href="#rates">OBMMI</a>
       <a class="nav-link" href="#pmms">PMMS</a>
       <a class="nav-link" href="#spread">Spread</a>
-      <a class="nav-link" href="#home-sales">Home Sales</a>
       <a class="nav-link" href="#forecast">Forecast</a>
-      <a class="nav-link" href="#industry-news">Industry News</a>
-      <a class="nav-link" href="#housing-news">Housing News</a>
-      <a class="nav-link" href="#outlook">Outlook</a>
+      <a class="nav-link" href="#industry-news">News</a>
     </nav>
     <div class="topbar-meta">
       <div class="hmeta">
@@ -1400,6 +1403,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
 <main>
 
+  <!-- ── FED NOTE ─────────────────────────────────────────────────────── -->
   <div class="fed-note">
     <div class="fed-icon">🏦</div>
     <div>
@@ -1408,6 +1412,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
+  <!-- ── 1-MINUTE BRIEFING ──────────────────────────────────────────────── -->
   <div class="brief-card">
     <div class="brief-head">
       <div class="brief-pulse"></div>
@@ -1419,10 +1424,93 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SECTION 1 — REAL ESTATE MARKET TRENDS
+       Redfin/Zillow pulse · Existing Sales · Housing Outlook · Econ · Risk
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="section-hd" id="real-estate">
+    <span class="section-hd-label">Real Estate Market Trends</span>
+  </div>
+
   <div class="slbl" id="housing-pulse">Housing Market Pulse · Redfin &amp; Zillow Data</div>
   <div class="panel" style="margin-bottom:2rem;overflow:hidden;padding:0;">
     <div class="ph"><h3>National Housing Market Conditions</h3><span class="badge badge-teal">Redfin · Zillow</span></div>
     {pulse_html}
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="slbl" id="home-sales">Existing Home Sales · NAR via FRED</div>
+      <div class="panel">
+        <div class="ph"><h3>Existing Home Sales</h3><span class="badge badge-teal">FRED · NAR</span></div>
+        {pending_html_str}
+        <div class="sb"><div class="sd"></div><span>NAR Existing Home Sales via FRED · Series EXHOSLUSM495S · Millions SAAR · Released monthly</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="slbl" id="outlook">Fannie Mae ESR · Housing &amp; Economic Outlook · {fannie_date}</div>
+      <div class="panel" style="height:100%;box-sizing:border-box;">
+        <div class="ph"><h3>Housing Market Outlook</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
+        <div style="padding:1rem 1.25rem;">
+          <div class="econ-grid" style="margin-bottom:.85rem;border:1px solid var(--border);border-radius:6px;">
+            <div class="econ-cell">
+              <div class="ec-label">Total Home Sales</div>
+              <div class="ec-val">{home_sales}</div>
+              <div class="ec-sub">ESR Forecast {TODAY.year}</div>
+            </div>
+            <div class="econ-cell">
+              <div class="ec-label">SF Starts YoY</div>
+              <div class="ec-val">{sf_starts}</div>
+              <div class="ec-sub">Single-family {TODAY.year}</div>
+            </div>
+          </div>
+          <div class="econ-grid" style="border:1px solid var(--border);border-radius:6px;">
+            <div class="econ-cell">
+              <div class="ec-label">GDP Growth</div>
+              <div class="ec-val">{gdp}</div>
+              <div class="ec-sub">{gdp_src}</div>
+            </div>
+            <div class="econ-cell">
+              <div class="ec-label">Unemployment</div>
+              <div class="ec-val">{unemployment}</div>
+              <div class="ec-sub">{unemp_src}</div>
+            </div>
+            <div class="econ-cell">
+              <div class="ec-label">CPI Inflation</div>
+              <div class="ec-val">{cpi}</div>
+              <div class="ec-sub">{cpi_src}</div>
+            </div>
+            <div class="econ-cell">
+              <div class="ec-label">10-Yr Treasury</div>
+              <div class="ec-val">{treasury10y}</div>
+              <div class="ec-sub">{tsy_src}</div>
+            </div>
+          </div>
+        </div>
+        <div class="sb"><div class="sd"></div><span>Fannie Mae ESR APIs · {fannie_date}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slbl">Market Risk Factors · Fannie Mae ESR · {fannie_date}</div>
+  <div class="panel" style="margin-bottom:2rem;">
+    <div class="ph"><h3>Market Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
+    <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem 2rem;">
+      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Slower GDP growth forecast — weaker economy supports lower rates but signals demand risk</div>
+      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Limited inventory despite lower rates — prices stay elevated, affordability constrained</div>
+      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Geopolitical events pushing oil &amp; Treasury yields higher near-term</div>
+      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Single-family starts forecast −6.2% YoY — supply constraints persist</div>
+      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-teal);font-weight:700;">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers better positioned than 2025</div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>Fannie Mae ESR Group · {fannie_date} Economic Forecast</span></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SECTION 2 — MORTGAGE & MARKET INSIGHTS
+       Key Indicators · OBMMI · PMMS · Fannie Forecast · Spread
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="section-hd" id="mortgage-insights">
+    <span class="section-hd-label">Mortgage &amp; Market Insights</span>
   </div>
 
   <div class="slbl">Key Indicators · {TODAY_STR}</div>
@@ -1501,14 +1589,6 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   <div class="two-col">
     <div>
-      <div class="slbl" id="home-sales">Existing Home Sales · NAR via FRED</div>
-      <div class="panel">
-        <div class="ph"><h3>Existing Home Sales</h3><span class="badge badge-teal">FRED · NAR</span></div>
-        {pending_html_str}
-        <div class="sb"><div class="sd"></div><span>NAR Existing Home Sales via FRED · Series EXHOSLUSM495S · Millions SAAR · Released monthly</span></div>
-      </div>
-    </div>
-    <div>
       <div class="slbl" id="forecast">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
       <div class="tbl-wrap" style="margin-bottom:0;">
         <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">Fannie Mae API</span></div>
@@ -1519,39 +1599,47 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
         <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Est. values from Mar 2026 ESR when API unavailable · Auto-updated monthly</span></div>
       </div>
     </div>
-  </div>
-
-  <div class="slbl" id="spread">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
-  <div class="panel" style="margin-bottom:2rem;">
-    <div class="ph"><h3>30Y Mortgage / 10Y Treasury Spread</h3><span class="badge badge-blue">FRED API</span></div>
-    <div class="pmms-strip">
-      <div class="pmms-cell">
-        <div class="pmms-lbl">Current Spread</div>
-        <div class="pmms-val" style="color:{'var(--nz-red)' if spread.get('spread_bps',0) and spread['spread_bps'] > 250 else 'var(--nz-teal)'};">{spread_bps_str}</div>
-        <div class="pmms-sub">30Y minus 10Y Treasury</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">30Y Mortgage</div>
-        <div class="pmms-val">{spread_r30}%</div>
-        <div class="pmms-sub">PMMS weekly avg</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">10Y Treasury</div>
-        <div class="pmms-val">{spread_t10}%</div>
-        <div class="pmms-sub">FRED DGS10 · Daily</div>
-      </div>
-      <div class="pmms-cell">
-        <div class="pmms-lbl">Signal</div>
-        <div class="pmms-val" style="font-size:1rem;color:{'var(--nz-red)' if spread.get('signal') == 'Elevated' else 'var(--nz-teal)'};">{spread_signal}</div>
-        <div class="pmms-sub">Pre-2022 norm ~170bps · 2023 peak ~310bps</div>
+    <div>
+      <div class="slbl" id="spread">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
+      <div class="panel" style="margin-bottom:0;">
+        <div class="ph"><h3>30Y Mortgage / 10Y Treasury Spread</h3><span class="badge badge-blue">FRED API</span></div>
+        <div class="pmms-strip" style="flex-wrap:wrap;">
+          <div class="pmms-cell">
+            <div class="pmms-lbl">Current Spread</div>
+            <div class="pmms-val" style="color:{'var(--nz-red)' if spread.get('spread_bps',0) and spread['spread_bps'] > 250 else 'var(--nz-teal)'};">{spread_bps_str}</div>
+            <div class="pmms-sub">30Y minus 10Y Treasury</div>
+          </div>
+          <div class="pmms-cell">
+            <div class="pmms-lbl">30Y Mortgage</div>
+            <div class="pmms-val">{spread_r30}%</div>
+            <div class="pmms-sub">PMMS weekly avg</div>
+          </div>
+          <div class="pmms-cell">
+            <div class="pmms-lbl">10Y Treasury</div>
+            <div class="pmms-val">{spread_t10}%</div>
+            <div class="pmms-sub">FRED DGS10 · Daily</div>
+          </div>
+          <div class="pmms-cell">
+            <div class="pmms-lbl">Signal</div>
+            <div class="pmms-val" style="font-size:1rem;color:{'var(--nz-red)' if spread.get('signal') == 'Elevated' else 'var(--nz-teal)'};">{spread_signal}</div>
+            <div class="pmms-sub">Pre-2022 norm ~170bps · 2023 peak ~310bps</div>
+          </div>
+        </div>
+        <div class="sb"><div class="sd"></div><span>FRED API · MORTGAGE30US (weekly) minus DGS10 (daily) · Spread tracks lender risk premium · Updated daily</span></div>
       </div>
     </div>
-    <div class="sb"><div class="sd"></div><span>FRED API · MORTGAGE30US (weekly) minus DGS10 (daily) · Spread tracks lender risk premium above risk-free rate · Updated daily</span></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SECTION 3 — INDUSTRY NEWS
+  ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="section-hd" id="industry-news">
+    <span class="section-hd-label">Industry News</span>
   </div>
 
   <div class="two-col">
     <div>
-      <div class="slbl" id="industry-news">Industry News · Inman</div>
+      <div class="slbl">Inman Real Estate News</div>
       <div class="panel">
         <div class="ph"><h3>Inman Real Estate News</h3><span class="badge badge-blue">Inman</span></div>
         {inman_html}
@@ -1565,70 +1653,6 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
         {fortune_html}
         <div class="sb"><div class="sd"></div><span>mortgagenewsdaily.com · Mortgage &amp; housing industry news · Auto-refreshed daily</span></div>
       </div>
-    </div>
-  </div>
-
-  <div class="slbl" id="outlook">Fannie Mae ESR · Economic & Housing Outlook · {fannie_date}</div>
-  <div class="three-col">
-    <div class="panel">
-      <div class="ph"><h3>Housing Market Outlook</h3><span class="badge badge-gold">Fannie Mae API</span></div>
-      <div style="padding:1rem 1.25rem;">
-        <div class="econ-grid" style="margin-bottom:.85rem;border:1px solid var(--border);border-radius:6px;">
-          <div class="econ-cell">
-            <div class="ec-label">Total Home Sales</div>
-            <div class="ec-val">{home_sales}</div>
-            <div class="ec-sub">ESR Forecast {TODAY.year}</div>
-          </div>
-          <div class="econ-cell">
-            <div class="ec-label">SF Starts YoY</div>
-            <div class="ec-val">{sf_starts}</div>
-            <div class="ec-sub">Single-family {TODAY.year}</div>
-          </div>
-        </div>
-        <p style="font-size:.72rem;line-height:1.65;color:var(--muted);">Both new and existing segments contributing to sales growth. Limited inventory despite lower rates keeps prices elevated. Spring season showing improving purchase applications vs last year.</p>
-      </div>
-      <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · {fannie_date}</span></div>
-    </div>
-    <div class="panel">
-      <div class="ph"><h3>Economic Indicators</h3><span class="badge badge-gold">Fannie Mae API</span></div>
-      <div style="padding:1rem 1.25rem;">
-        <div class="econ-grid" style="border:1px solid var(--border);border-radius:6px;">
-          <div class="econ-cell">
-            <div class="ec-label">GDP Growth</div>
-            <div class="ec-val">{gdp}</div>
-            <div class="ec-sub">{gdp_src}</div>
-          </div>
-          <div class="econ-cell">
-            <div class="ec-label">Unemployment</div>
-            <div class="ec-val">{unemployment}</div>
-            <div class="ec-sub">{unemp_src}</div>
-          </div>
-          <div class="econ-cell">
-            <div class="ec-label">CPI Inflation</div>
-            <div class="ec-val">{cpi}</div>
-            <div class="ec-sub">{cpi_src}</div>
-          </div>
-          <div class="econ-cell">
-            <div class="ec-label">10-Yr Treasury</div>
-            <div class="ec-val">{treasury10y}</div>
-            <div class="ec-sub">{tsy_src}</div>
-          </div>
-        </div>
-      </div>
-      <div class="sb"><div class="sd"></div><span>Fannie Mae Economic Indicators API · {fannie_date}</span></div>
-    </div>
-    <div class="panel">
-      <div class="ph"><h3>Market Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
-      <div style="padding:1rem 1.25rem;">
-        <div style="font-size:.73rem;line-height:1.75;color:var(--muted);">
-          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Slower GDP growth forecast — weaker economy supports lower rates but signals demand risk</div>
-          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Limited inventory despite lower rates — prices stay elevated, affordability constrained</div>
-          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Geopolitical events pushing oil &amp; Treasury yields higher near-term</div>
-          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Single-family starts forecast −6.2% YoY — supply constraints persist</div>
-          <div><span style="color:var(--nz-teal);font-weight:700;">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers better positioned than 2025</div>
-        </div>
-      </div>
-      <div class="sb"><div class="sd"></div><span>Fannie Mae ESR Group · {fannie_date} Economic Forecast</span></div>
     </div>
   </div>
 
