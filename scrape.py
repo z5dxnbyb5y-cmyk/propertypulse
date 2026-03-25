@@ -504,7 +504,7 @@ def build_pending_html(pending):
             # Normalize to range so small month-to-month differences are visible
             h_pct = max(15, round(((v - min_v) / rng) * 75 + 15))
             is_last = i == len(vals) - 1
-            col = "var(--nz-blue)" if is_last else "var(--nz-blue-mid)" if v == max(vals) else "var(--border)"
+            col = "var(--nz-blue)" if is_last else "var(--border)"
             bars += f'<div style="flex:1;height:{h_pct}%;background:{col};border-radius:2px 2px 0 0;min-width:8px;"></div>'
 
     return (
