@@ -405,17 +405,17 @@ def fetch_fortune_news():
 
 def fetch_pending():
     """
-    Fetch NAR Pending Home Sales Index via FRED.
-    Series: PENDING (monthly, seasonally adjusted, 2001=100)
-    Leading indicator: signed contracts ~30-60 days before closing.
+    Fetch NAR Existing Home Sales via FRED.
+    Series: EXHOSLUSM495S (monthly, seasonally adjusted annual rate, millions of units)
+    Confirmed FRED series — NAR data, released ~3-4 weeks after reference month.
     """
-    print("Fetching Pending Home Sales from FRED...")
+    print("Fetching Existing Home Sales from FRED...")
     key = (FRED_KEY or "").strip()
     if not key:
-        print("  WARN: FRED_API_KEY not set, skipping PENDING")
+        print("  WARN: FRED_API_KEY not set, skipping EXHOSLUSM495S")
         return {"value": None, "prev": None, "date": None, "yoy": None, "mom": None}
     params = urllib.parse.urlencode({
-        "series_id": "PENDING", "api_key": key, "file_type": "json",
+        "series_id": "EXHOSLUSM495S", "api_key": key, "file_type": "json",
         "sort_order": "desc", "limit": 15,
     })
     raw = fetch(f"https://api.stlouisfed.org/fred/series/observations?{params}")
@@ -425,7 +425,7 @@ def fetch_pending():
             data = json.loads(raw)
             obs = [o for o in data.get("observations", []) if o.get("value") not in (".", "")]
         except Exception as e:
-            print(f"  FRED parse error PENDING: {e}")
+            print(f"  FRED parse error EXHOSLUSM495S: {e}")
     if not obs:
         return {"value": None, "prev": None, "date": None, "yoy": None, "mom": None}
     valid = []
@@ -446,9 +446,9 @@ def fetch_pending():
     except:
         date_str = current["date"]
     if mom is not None and yoy is not None:
-        print(f"  Pending: {current['val']:.1f} ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
+        print(f"  Existing Home Sales: {current['val']:.2f}M SAAR ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
     else:
-        print(f"  Pending: {current['val']:.1f} ({date_str})")
+        print(f"  Existing Home Sales: {current['val']:.2f}M SAAR ({date_str})")
     return {
         "value":   round(current["val"], 1),
         "prev":    round(prev_mo["val"], 1) if prev_mo else None,
@@ -483,7 +483,7 @@ def build_pending_html(pending):
     hist = pending.get("history", [])
 
     if val is None:
-        return '<div style="padding:.5rem 0;color:var(--muted);font-size:.75rem;">Pending Home Sales data unavailable.</div>'
+        return '<div style="padding:.5rem 0;color:var(--muted);font-size:.75rem;">Existing Home Sales data unavailable.</div>'
 
     mom_col   = "var(--nz-teal)" if (mom or 0) >= 0 else "var(--nz-red)"
     yoy_col   = "var(--nz-teal)" if (yoy or 0) >= 0 else "var(--nz-red)"
@@ -506,9 +506,9 @@ def build_pending_html(pending):
         '\n<div style="padding:1rem 1.25rem;">'
         '\n  <div style="display:flex;align-items:flex-end;gap:1.5rem;margin-bottom:1rem;">'
         '\n    <div>'
-        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Index Value &middot; {date}</div>'
-        f'\n      <div style="font-size:2.2rem;font-weight:700;line-height:1;color:var(--ink);">{val:.1f}</div>'
-        '\n      <div style="font-family:\'DM Mono\',monospace;font-size:.54rem;color:var(--muted);margin-top:.2rem;">2001 = 100 baseline</div>'
+        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">SAAR &middot; {date}</div>'
+        f'\n      <div style="font-size:2.2rem;font-weight:700;line-height:1;color:var(--ink);">{val:.2f}M</div>'
+        '\n      <div style="font-family:\'DM Mono\',monospace;font-size:.54rem;color:var(--muted);margin-top:.2rem;">Millions of units, seasonally adjusted annual rate</div>'
         '\n    </div>'
         '\n    <div style="display:flex;flex-direction:column;gap:.4rem;">'
         f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.65rem;font-weight:600;color:{mom_col};">{mom_str}</div>'
@@ -830,7 +830,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
     <div class="hmeta">
       <div>{TODAY_STR}</div>
-      <div>OBMMI · PMMS · Fannie Mae ESR · Pending Sales · Inman · Fortune</div>
+      <div>OBMMI · PMMS · Fannie Mae ESR · Existing Sales · Inman · Fortune</div>
     </div>
     <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;">
       Auto-updated daily<br>Last run: {RUN_TS}
@@ -930,11 +930,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   <div class="two-col">
     <div>
-      <div class="slbl">Pending Home Sales · NAR via FRED</div>
+      <div class="slbl">Existing Home Sales · NAR via FRED</div>
       <div class="panel">
-        <div class="ph"><h3>Pending Home Sales Index</h3><span class="badge badge-teal">FRED · NAR</span></div>
+        <div class="ph"><h3>Existing Home Sales</h3><span class="badge badge-teal">FRED · NAR</span></div>
         {pending_html_str}
-        <div class="sb"><div class="sd"></div><span>NAR Pending Home Sales via FRED · Series PENDING · Seasonally adjusted · Monthly leading indicator</span></div>
+        <div class="sb"><div class="sd"></div><span>NAR Existing Home Sales via FRED · Series EXHOSLUSM495S · Millions SAAR · Released monthly</span></div>
       </div>
     </div>
     <div>
@@ -1143,4 +1143,3 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
     print(f"{'='*60}\n")
-
