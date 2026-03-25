@@ -445,17 +445,20 @@ def fetch_pending():
         date_str = datetime.datetime.strptime(current["date"], "%Y-%m-%d").strftime("%b %Y")
     except:
         date_str = current["date"]
+    # FRED EXHOSLUSM495S is in thousands of units — divide by 1000 for millions
+    cur_m  = round(current['val'] / 1000, 2)
+    prev_m = round(prev_mo['val'] / 1000, 2) if prev_mo else None
     if mom is not None and yoy is not None:
-        print(f"  Existing Home Sales: {current['val']:.2f}M SAAR ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
+        print(f"  Existing Home Sales: {cur_m:.2f}M SAAR ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
     else:
-        print(f"  Existing Home Sales: {current['val']:.2f}M SAAR ({date_str})")
+        print(f"  Existing Home Sales: {cur_m:.2f}M SAAR ({date_str})")
     return {
-        "value":   round(current["val"], 1),
-        "prev":    round(prev_mo["val"], 1) if prev_mo else None,
+        "value":   cur_m,
+        "prev":    prev_m,
         "yoy":     yoy,
         "mom":     mom,
         "date":    date_str,
-        "history": [{"val": o["val"], "date": o["date"]} for o in valid[:6]],
+        "history": [{"val": round(o["val"] / 1000, 2), "date": o["date"]} for o in valid[:6]],
     }
 
 
@@ -495,11 +498,13 @@ def build_pending_html(pending):
     bars = ""
     if hist:
         vals = [h["val"] for h in reversed(hist)]
-        max_v = max(vals) or 1
+        min_v = min(vals)
+        rng   = (max(vals) - min_v) or 1
         for i, v in enumerate(vals):
-            h_pct = max(8, round(v / max_v * 100))
+            # Normalize to range so small month-to-month differences are visible
+            h_pct = max(15, round(((v - min_v) / rng) * 75 + 15))
             is_last = i == len(vals) - 1
-            col = "var(--nz-blue)" if is_last else "var(--border)"
+            col = "var(--nz-blue)" if is_last else "var(--nz-blue-mid)" if v == max(vals) else "var(--border)"
             bars += f'<div style="flex:1;height:{h_pct}%;background:{col};border-radius:2px 2px 0 0;min-width:8px;"></div>'
 
     return (
@@ -1143,3 +1148,4 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
     print(f"{'='*60}\n")
+
