@@ -1254,9 +1254,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .brief-body{{padding:.5rem 0 1rem}}
   .brief-row{{display:grid;grid-template-columns:150px 1fr;gap:1.75rem;padding:1.1rem 2rem;border-bottom:1px solid rgba(255,255,255,.08);align-items:baseline}}
   .brief-row-last{{border-bottom:none}}
-  .brief-lbl{{font-family:'Inter',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);line-height:1.4}}
-  .brief-val{{font-family:'Inter',sans-serif;font-size:.95rem;font-weight:400;line-height:1.65;color:rgba(255,255,255,.9)}}
-  .brief-row:first-child .brief-val{{font-weight:600;color:white}}
+  .brief-lbl{{font-family:'Inter',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.01em;text-transform:uppercase;color:white;line-height:1.4}}
+  .brief-val{{font-family:'Inter',sans-serif;font-size:.95rem;font-weight:400;line-height:1.65;color:rgba(255,255,255,.85)}}
+  .brief-row:first-child .brief-val{{font-weight:400;color:rgba(255,255,255,.85)}}
 
   /* HOUSING PULSE */
   .hp-signal{{border-radius:8px;padding:.85rem 1.25rem;margin:.75rem 1.25rem;}}
