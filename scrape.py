@@ -368,37 +368,67 @@ def fetch_inman_news():
 # ── FORTUNE RSS ───────────────────────────────────────────────────────────────
 
 def fetch_fortune_news():
-    print("Fetching Fortune Real Estate RSS...")
-    raw = fetch("https://fortune.com/tag/real-estate/feed/")
+    """
+    Fetch housing market news from Calculated Risk Blog RSS.
+    Replaces Fortune RSS which was returning off-topic articles.
+    Calculated Risk is housing/mortgage focused, updated daily.
+    Falls back to HousingWire housing market section if needed.
+    """
+    print("Fetching Calculated Risk housing news...")
     articles = []
     seen = set()
-    for m in re.finditer(
-        r'<item>.*?<title><!\[CDATA\[(.*?)\]\]></title>.*?<link>(.*?)</link>.*?<pubDate>(.*?)</pubDate>',
-        raw, re.DOTALL
-    ):
-        title,url,pub = m.group(1).strip(),m.group(2).strip(),m.group(3).strip()
-        if url in seen or len(title)<15: continue
-        seen.add(url)
-        try:
-            dt = datetime.datetime.strptime(pub[:25],"%a, %d %b %Y %H:%M")
-            date_str = dt.strftime("%b %d, %Y")
-        except: date_str = pub[:16]
-        articles.append({"title":title,"url":url,"date":date_str,"desc":""})
-        if len(articles) >= 6: break
-    if not articles:
-        html = fetch("https://fortune.com/section/real-estate/")
-        for m in re.finditer(r'href="(https://fortune\.com/(?:article/)?20\d\d/\d\d/\d\d/[^"]+?)"[^>]*?>([^<]{20,200})</a>',html,re.IGNORECASE):
-            url,title = m.group(1),re.sub(r'\s+',' ',m.group(2).strip())
-            if url not in seen and len(title)>20 and '<' not in title:
-                seen.add(url)
-                dm = re.search(r'/(\d{4})/(\d{2})/(\d{2})/',url)
-                date_str = ""
-                if dm:
-                    try: date_str = datetime.date(int(dm.group(1)),int(dm.group(2)),int(dm.group(3))).strftime("%b %d, %Y")
-                    except: pass
-                articles.append({"title":title,"url":url,"date":date_str,"desc":""})
+
+    # Primary: Calculated Risk Blog RSS
+    raw = fetch("https://www.calculatedriskblog.com/feeds/posts/default")
+    if raw:
+        for m in re.finditer(
+            r'<entry>(.*?)</entry>', raw, re.DOTALL | re.IGNORECASE
+        ):
+            block = m.group(1)
+            title_m = re.search(r'<title[^>]*>(.*?)</title>', block, re.DOTALL)
+            link_m  = re.search(r'<link[^>]+href=["\']([^"\']+)["\']', block, re.DOTALL)
+            pub_m   = re.search(r'<published>(.*?)</published>', block, re.DOTALL)
+            if not (title_m and link_m): continue
+            title = re.sub(r'<[^>]+>', '', title_m.group(1)).strip()
+            url   = link_m.group(1).strip()
+            pub   = pub_m.group(1).strip() if pub_m else ""
+            if url in seen or len(title) < 15: continue
+            # Skip posts that are clearly not housing-relevant
+            tl = title.lower()
+            if any(x in tl for x in ['hotel', 'stock market', 's&p', 'treasury auction', 'fed speak']): continue
+            seen.add(url)
+            try:
+                dt = datetime.datetime.strptime(pub[:10], "%Y-%m-%d")
+                date_str = dt.strftime("%b %d, %Y")
+            except: date_str = pub[:10]
+            articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
             if len(articles) >= 6: break
-    print(f"  Fortune: {len(articles)} articles")
+
+    # Fallback: HousingWire housing market RSS
+    if not articles:
+        raw = fetch("https://www.housingwire.com/feed/")
+        if raw:
+            for m in re.finditer(
+                r'<item>(.*?)</item>', raw, re.DOTALL | re.IGNORECASE
+            ):
+                block = m.group(1)
+                title_m = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', block, re.DOTALL)
+                link_m  = re.search(r'<link>(.*?)</link>', block, re.DOTALL)
+                pub_m   = re.search(r'<pubDate>(.*?)</pubDate>', block, re.DOTALL)
+                if not (title_m and link_m): continue
+                title = title_m.group(1).strip()
+                url   = link_m.group(1).strip()
+                pub   = pub_m.group(1).strip() if pub_m else ""
+                if url in seen or len(title) < 15: continue
+                seen.add(url)
+                try:
+                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
+                    date_str = dt.strftime("%b %d, %Y")
+                except: date_str = pub[:16]
+                articles.append({"title": title, "url": url, "date": date_str, "desc": ""})
+                if len(articles) >= 6: break
+
+    print(f"  Calculated Risk / HousingWire: {len(articles)} articles")
     return articles
 
 # ── PENDING HOME SALES ───────────────────────────────────────────────────────
@@ -1007,11 +1037,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       </div>
     </div>
     <div>
-      <div class="slbl">Market News · Fortune</div>
+      <div class="slbl">Housing Market News · Calculated Risk</div>
       <div class="panel">
-        <div class="ph"><h3>Fortune Real Estate</h3><span class="badge badge-blue">Fortune</span></div>
+        <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">Calculated Risk</span></div>
         {fortune_html}
-        <div class="sb"><div class="sd"></div><span>fortune.com/tag/real-estate · Auto-refreshed daily</span></div>
+        <div class="sb"><div class="sd"></div><span>calculatedriskblog.com · Housing &amp; mortgage market analysis · Auto-refreshed daily</span></div>
       </div>
     </div>
   </div>
@@ -1088,8 +1118,8 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     OBMMI: Optimal Blue via FRED &nbsp;·&nbsp;
     PMMS: Freddie Mac via FRED &nbsp;·&nbsp;
     Fannie Mae ESR APIs &nbsp;·&nbsp;
-    MBA via mba.org newsroom &nbsp;·&nbsp;
-    Inman &amp; Fortune RSS &nbsp;·&nbsp;
+    NAR Existing Home Sales via FRED &nbsp;·&nbsp;
+    Inman &amp; Calculated Risk RSS &nbsp;·&nbsp;
     Not financial advice &nbsp;·&nbsp; {RUN_TS}
   </div>
   <div class="footer-logo"><img src="{{LOGO_SRC}}" alt="Newzip"></div>
@@ -1162,3 +1192,4 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
     print(f"{'='*60}\n")
+
