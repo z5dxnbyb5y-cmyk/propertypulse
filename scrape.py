@@ -401,305 +401,96 @@ def fetch_fortune_news():
     print(f"  Fortune: {len(articles)} articles")
     return articles
 
-# ── MBA / PURCHASE APPLICATIONS ───────────────────────────────────────────────
+# ── PENDING HOME SALES ───────────────────────────────────────────────────────
 
-def fetch_mba():
+def fetch_pending():
     """
-    Fetch MBA Weekly Purchase Applications data.
-
-    Source priority:
-      1. MBA.org newsroom — official press releases, published every Wednesday,
-         freely accessible, full Purchase Index text with exact figures.
-      2. Calculated Risk Blog RSS — re-publishes MBA data with full body text
-      3. Inman RSS — headline only (last resort for link display)
+    Fetch NAR Pending Home Sales Index via FRED.
+    Series: PENDING (monthly, seasonally adjusted, 2001=100)
+    Leading indicator: signed contracts ~30-60 days before closing.
     """
-    print("Fetching MBA Purchase Application data...")
-    weeks, items = [], []
+    print("Fetching Pending Home Sales from FRED...")
+    obs = fred("PENDING", limit=15)
+    if not obs:
+        return {"value": None, "prev": None, "date": None, "yoy": None, "mom": None}
+    valid = []
+    for o in obs:
+        try:
+            v = float(o["value"])
+            valid.append({"val": v, "date": o["date"]})
+        except: pass
+    if not valid:
+        return {"value": None, "prev": None, "date": None, "yoy": None, "mom": None}
+    current = valid[0]
+    prev_mo = valid[1] if len(valid) > 1 else None
+    yago    = valid[12] if len(valid) > 12 else None
+    mom = round((current["val"] - prev_mo["val"]) / prev_mo["val"] * 100, 1) if prev_mo else None
+    yoy = round((current["val"] - yago["val"])    / yago["val"]   * 100, 1) if yago    else None
+    try:
+        date_str = datetime.datetime.strptime(current["date"], "%Y-%m-%d").strftime("%b %Y")
+    except:
+        date_str = current["date"]
+    if mom is not None and yoy is not None:
+        print(f"  Pending: {current['val']:.1f} ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
+    else:
+        print(f"  Pending: {current['val']:.1f} ({date_str})")
+    return {
+        "value":   round(current["val"], 1),
+        "prev":    round(prev_mo["val"], 1) if prev_mo else None,
+        "yoy":     yoy,
+        "mom":     mom,
+        "date":    date_str,
+        "history": [{"val": o["val"], "date": o["date"]} for o in valid[:6]],
+    }
 
-    def extract_purchase_pct(text):
-        m = re.search(
-            r"seasonally adjusted Purchase Index (increased|decreased)\s+([\d.]+)\s*percent",
-            text, re.I
-        )
-        if m:
-            val = float(m.group(2))
-            return -val if m.group(1).lower() == "decreased" else val
-        m = re.search(
-            r"unadjusted Purchase Index (increased|decreased)\s+([\d.]+)\s*percent",
-            text, re.I
-        )
-        if m:
-            val = float(m.group(2))
-            return -val if m.group(1).lower() == "decreased" else val
-        return None
 
-    def extract_yoy_pct(text):
-        m = re.search(
-            r"unadjusted Purchase Index.*?was\s+([\d.]+)\s*percent (higher|lower) than the same week one year",
-            text, re.I
-        )
-        if m:
-            val = float(m.group(1))
-            return -val if m.group(2).lower() == "lower" else val
-        return None
+def build_pending_html(pending):
+    val  = pending.get("value")
+    mom  = pending.get("mom")
+    yoy  = pending.get("yoy")
+    date = pending.get("date") or "N/A"
+    hist = pending.get("history", [])
 
-    def extract_week_ending(text):
-        m = re.search(r"week ending\s+(\w+ \d+,?\s*\d{4})", text, re.I)
-        return m.group(1).strip() if m else ""
+    if val is None:
+        return '<div style="padding:.5rem 0;color:var(--muted);font-size:.75rem;">Pending Home Sales data unavailable.</div>'
 
-    # ── PRIMARY: HousingWire MBA articles ────────────────────────────────────────
-    # HousingWire publishes a full public news article every Wednesday covering the
-    # MBA weekly survey — with complete purchase index figures in the article body.
-    # Article URLs follow pattern: housingwire.com/articles/mba-* or /mortgage-applications-*
-    print("  Trying HousingWire MBA articles...")
-    hw_search_urls = [
-        "https://www.housingwire.com/mortgage-news/",
-        "https://www.housingwire.com/category/mortgage/",
-    ]
-    hw_links = []
-    for search_url in hw_search_urls:
-        index_html = fetch(search_url, timeout=20)
-        if not index_html:
-            continue
-        for m in re.finditer(
-            r'href="(https://www\.housingwire\.com/articles/[^"]*(?:mba|mortgage-applications)[^"]*)"'
-            , index_html, re.I
-        ):
-            url = m.group(1).split("?")[0]
-            if url not in hw_links:
-                hw_links.append(url)
-        if hw_links:
-            break
+    mom_col   = "var(--nz-teal)" if (mom or 0) >= 0 else "var(--nz-red)"
+    yoy_col   = "var(--nz-teal)" if (yoy or 0) >= 0 else "var(--nz-red)"
+    mom_arrow = "&#8593;" if (mom or 0) >= 0 else "&#8595;"
+    yoy_arrow = "&#8593;" if (yoy or 0) >= 0 else "&#8595;"
+    mom_str   = f"{mom_arrow} {abs(mom):.1f}% MoM" if mom is not None else "MoM N/A"
+    yoy_str   = f"{yoy_arrow} {abs(yoy):.1f}% YoY" if yoy is not None else "YoY N/A"
 
-    # Also try direct Google-style search for most recent HW MBA article
-    if not hw_links:
-        # Fetch HousingWire sitemap or tag page for MBA
-        sitemap_html = fetch("https://www.housingwire.com/tag/mba/", timeout=20)
-        if sitemap_html:
-            for m in re.finditer(
-                r'href="(https://www\.housingwire\.com/articles/[^"]+)"'
-                , sitemap_html, re.I
-            ):
-                url = m.group(1).split("?")[0]
-                if url not in hw_links:
-                    hw_links.append(url)
+    bars = ""
+    if hist:
+        vals = [h["val"] for h in reversed(hist)]
+        max_v = max(vals) or 1
+        for i, v in enumerate(vals):
+            h_pct = max(8, round(v / max_v * 100))
+            is_last = i == len(vals) - 1
+            col = "var(--nz-blue)" if is_last else "var(--border)"
+            bars += f'<div style="flex:1;height:{h_pct}%;background:{col};border-radius:2px 2px 0 0;min-width:8px;"></div>'
 
-    print(f"  HousingWire: found {len(hw_links)} candidate article links")
+    return (
+        '\n<div style="padding:1rem 1.25rem;">'
+        '\n  <div style="display:flex;align-items:flex-end;gap:1.5rem;margin-bottom:1rem;">'
+        '\n    <div>'
+        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Index Value &middot; {date}</div>'
+        f'\n      <div style="font-size:2.2rem;font-weight:700;line-height:1;color:var(--ink);">{val:.1f}</div>'
+        '\n      <div style="font-family:\'DM Mono\',monospace;font-size:.54rem;color:var(--muted);margin-top:.2rem;">2001 = 100 baseline</div>'
+        '\n    </div>'
+        '\n    <div style="display:flex;flex-direction:column;gap:.4rem;">'
+        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.65rem;font-weight:600;color:{mom_col};">{mom_str}</div>'
+        f'\n      <div style="font-family:\'DM Mono\',monospace;font-size:.65rem;font-weight:600;color:{yoy_col};">{yoy_str}</div>'
+        '\n    </div>'
+        '\n  </div>'
+        '\n  <div style="display:flex;align-items:flex-end;gap:3px;height:40px;background:var(--paper2);border-radius:4px;padding:4px;">'
+        f'\n    {bars}'
+        '\n  </div>'
+        '\n  <div style="font-family:\'DM Mono\',monospace;font-size:.5rem;color:var(--muted);margin-top:.3rem;">6-month trend (older left, newer right)</div>'
+        '\n</div>'
+    )
 
-    for hw_url in hw_links[:5]:
-        hw_html = fetch(hw_url, timeout=25)
-        if not hw_html:
-            continue
-        text = re.sub(r"<[^>]+>", " ", hw_html)
-        text = re.sub(r"\s+", " ", text)
-
-        # Only process if this is an MBA applications article
-        tl = text[:500].lower()
-        if "mortgage applications" not in tl and "purchase index" not in tl:
-            if "mba" not in tl or "application" not in tl:
-                continue
-
-        purchase_val = extract_purchase_pct(text)
-        yoy_val      = extract_yoy_pct(text)
-        week_end     = extract_week_ending(text)
-
-        title_m = re.search(r"<title>(.*?)</title>", hw_html, re.I | re.DOTALL)
-        h1_m    = re.search(r"<h1[^>]*>(.*?)</h1>", hw_html, re.I | re.DOTALL)
-        raw_title = h1_m or title_m
-        title = ""
-        if raw_title:
-            title = re.sub(r"<[^>]+>", "", raw_title.group(1)).strip()
-            title = re.sub(r"\s+", " ", title)
-            title = re.sub(r"\s*[|\-\u2013].*HousingWire.*$", "", title, flags=re.I).strip()
-
-        # Extract date from URL /YYYY/MM/DD/ or og:article:published_time
-        date_str = ""
-        date_m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", hw_url)
-        if date_m:
-            try:
-                dt = datetime.date(int(date_m.group(1)), int(date_m.group(2)), int(date_m.group(3)))
-                date_str = dt.strftime("%b %d, %Y")
-            except: pass
-        if not date_str:
-            pub_m = re.search(r'published[_-]time"\s+content="(\d{4}-\d{2}-\d{2})', hw_html, re.I)
-            if pub_m:
-                try:
-                    dt = datetime.datetime.strptime(pub_m.group(1), "%Y-%m-%d")
-                    date_str = dt.strftime("%b %d, %Y")
-                except: pass
-
-        if not title:
-            title = "MBA Weekly Mortgage Applications Survey"
-
-        entry = {
-            "title":    title,
-            "url":      hw_url,
-            "date":     date_str,
-            "val":      purchase_val,
-            "yoy":      yoy_val,
-            "week_end": week_end,
-        }
-        items.append(entry)
-        if purchase_val is not None:
-            weeks.append(entry)
-            print(f"  HousingWire: Purchase Index {purchase_val:+.1f}% WoW ({week_end}) — {title[:60]}")
-
-    if items:
-        print(f"  HousingWire: {len(items)} articles found, {len(weeks)} with purchase val")
-
-    # ── FALLBACK 1: MBA.org newsroom ──────────────────────────────────────────
-    if not items:
-        print("  Falling back to MBA.org newsroom...")
-        newsroom_html = fetch("https://www.mba.org/news-and-research/newsroom/news", timeout=25)
-        if newsroom_html:
-            pr_links = []
-            for m in re.finditer(
-                r'href="(/news-and-research/newsroom/news/\d{4}/\d{2}/\d{2}/mortgage-applications[^"]*)"'
-                , newsroom_html, re.I
-            ):
-                url = "https://www.mba.org" + m.group(1)
-                if url not in pr_links:
-                    pr_links.append(url)
-
-            for pr_url in pr_links[:3]:
-                pr_html = fetch(pr_url, timeout=25)
-                if not pr_html: continue
-                text = re.sub(r"<[^>]+>", " ", pr_html)
-                text = re.sub(r"\s+", " ", text)
-                purchase_val = extract_purchase_pct(text)
-                yoy_val      = extract_yoy_pct(text)
-                week_end     = extract_week_ending(text)
-                title_m = re.search(r"<h1[^>]*>(.*?)</h1>", pr_html, re.I | re.DOTALL)
-                title = re.sub(r"<[^>]+>", "", title_m.group(1)).strip() if title_m else "MBA Weekly Survey"
-                date_m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", pr_url)
-                date_str = ""
-                if date_m:
-                    try:
-                        dt = datetime.date(int(date_m.group(1)), int(date_m.group(2)), int(date_m.group(3)))
-                        date_str = dt.strftime("%b %d, %Y")
-                    except: pass
-                entry = {"title": title, "url": pr_url, "date": date_str,
-                         "val": purchase_val, "yoy": yoy_val, "week_end": week_end}
-                items.append(entry)
-                if purchase_val is not None:
-                    weeks.append(entry)
-            print(f"  MBA.org: {len(items)} press releases, {len(weeks)} with purchase val")
-
-    # ── FALLBACK 1: Calculated Risk Blog RSS ───────────────────────────────────
-    if not items:
-        print("  Falling back to Calculated Risk Blog RSS...")
-        raw = fetch("https://www.calculatedriskblog.com/feeds/posts/default")
-        if raw:
-            for block_m in re.finditer(r"<item>(.*?)</item>", raw, re.DOTALL | re.IGNORECASE):
-                block = block_m.group(1)
-                title_m = re.search(r"<title>(.*?)</title>", block, re.DOTALL)
-                link_m  = re.search(r"<link>(.*?)</link>",   block, re.DOTALL)
-                pub_m   = re.search(r"<pubDate>(.*?)</pubDate>", block, re.DOTALL)
-                desc_m  = re.search(
-                    r"(?:<description>|<content:encoded>)(.*?)(?:</description>|</content:encoded>)",
-                    block, re.DOTALL | re.IGNORECASE
-                )
-                if not (title_m and link_m): continue
-                title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", title_m.group(1)).strip()
-                title = re.sub(r"<[^>]+>", "", title).strip()
-                url   = link_m.group(1).strip()
-                pub   = pub_m.group(1).strip() if pub_m else ""
-                if "calculatedriskblog.com" not in url: continue
-                tl = title.lower()
-                if "mba" not in tl and "application" not in tl: continue
-                if "hpsi" in tl or "sentiment" in tl or "builder" in tl: continue
-                try:
-                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
-                    date_str = dt.strftime("%b %d, %Y")
-                except: date_str = pub[:16]
-                body = ""
-                if desc_m:
-                    body = re.sub(r"<[^>]+>", " ", desc_m.group(1))
-                    body = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", body)
-                purchase_val = extract_purchase_pct(body)
-                yoy_val      = extract_yoy_pct(body)
-                week_end     = extract_week_ending(body)
-                entry = {"title": title, "url": url, "date": date_str,
-                         "val": purchase_val, "yoy": yoy_val, "week_end": week_end}
-                items.append(entry)
-                if purchase_val is not None:
-                    weeks.append(entry)
-                if len(items) >= 3: break
-            print(f"  Calculated Risk: {len(items)} MBA posts, {len(weeks)} with purchase val")
-
-    # ── FALLBACK 2: Inman headlines only ──────────────────────────────────────
-    if not items:
-        print("  Falling back to Inman RSS (headline-only)...")
-        raw = fetch("https://feeds.feedburner.com/inmannews")
-        if raw:
-            for block_m in re.finditer(r"<item>(.*?)</item>", raw, re.DOTALL | re.IGNORECASE):
-                block = block_m.group(1)
-                title_m = re.search(r"<title>(.*?)</title>", block, re.DOTALL)
-                link_m  = re.search(r"<link>(.*?)</link>",   block, re.DOTALL)
-                pub_m   = re.search(r"<pubDate>(.*?)</pubDate>", block, re.DOTALL)
-                if not (title_m and link_m): continue
-                title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", title_m.group(1)).strip()
-                title = re.sub(r"<[^>]+>", "", title).strip()
-                url   = link_m.group(1).strip()
-                pub   = pub_m.group(1).strip() if pub_m else ""
-                tl = title.lower()
-                if "mba" not in tl and "application" not in tl: continue
-                try:
-                    dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
-                    date_str = dt.strftime("%b %d, %Y")
-                except: date_str = pub[:16]
-                items.append({"title": title, "url": url, "date": date_str,
-                               "val": None, "yoy": None, "week_end": ""})
-                if len(items) >= 3: break
-            print(f"  Inman fallback: {len(items)} items")
-
-    print(f"  MBA final: {len(weeks)} with values, {len(items)} items total")
-    return {"weeks": weeks[:3], "items": items[:3]}
-def build_news_items(articles, show_desc=False):
-    if not articles:
-        return '<div style="padding:1rem;color:var(--muted);font-size:.75rem;">No articles available.</div>'
-    out = ""
-    for a in articles:
-        desc_html = f'\n      <div class="ni-desc">{a["desc"]}</div>' if show_desc and a.get("desc") else ""
-        out += (
-            f'\n    <a class="news-item" href="{a["url"]}" target="_blank" rel="noopener">'
-            f'\n      <div class="ni-date">{a["date"]}</div>'
-            f'\n      <div class="ni-title">{a["title"]}</div>'
-            f'{desc_html}'
-            f'\n    </a>'
-        )
-    return out
-
-def build_mba_html(mba):
-    weeks = mba.get("weeks",[])
-    items = mba.get("items",[])
-    if weeks:
-        bars = ""
-        for w in weeks:
-            val = w["val"]
-            pct = min(95,abs(val)/12*100)
-            col = "var(--nz-teal)" if val >= 0 else "var(--nz-red)"
-            sign = "+" if val >= 0 else ""
-            arr = "↑" if val >= 0 else "↓"
-            tag = "Rising" if val > 0 else "Declining"
-            bars += (
-                f'\n<div class="bar-row">'
-                f'<div class="bar-week">{w["date"][:6]}</div>'
-                f'<div class="bar-track"><div class="bar-inner" style="width:{pct:.0f}%;background:{col};">'
-                f'<span>{sign}{val:.1f}%</span></div></div>'
-                f'<div class="bar-tag" style="color:{col};">{arr} {tag}</div></div>'
-            )
-        return f'<div class="chart-label">Total Applications — WoW Change</div>{bars}'
-    if items:
-        out = '<div class="chart-label">Latest MBA Headlines</div>'
-        for item in items[:3]:
-            out += (
-                f'\n<a href="{item["url"]}" target="_blank" rel="noopener" class="mba-link">'
-                f'<div class="ni-date">{item["date"]}</div>'
-                f'<div style="font-size:.75rem;font-weight:600;">{item["title"]}</div></a>'
-            )
-        return out
-    return '<div style="padding:.5rem 0;color:var(--muted);font-size:.75rem;">MBA data temporarily unavailable.</div>'
 
 def build_fannie_rows(housing):
     year = TODAY.year
@@ -790,11 +581,11 @@ def build_ticker(rates, pmms, hpsi, spread=None):
 
 # ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
-def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, mba, spread):
+def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread):
     rates_json     = json.dumps(rates)
     fortune_html   = build_news_items(news_fortune)
     inman_html     = build_news_items(news_inman, show_desc=True)
-    mba_html_str   = build_mba_html(mba)
+    pending_html_str = build_pending_html(pending)
     fannie_rows_str = build_fannie_rows(housing)
     ticker_str     = build_ticker(rates, pmms, hpsi, spread)
 
@@ -846,10 +637,6 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
     spread_cls        = "pos" if _spread_sig_color == "nz-teal" else "neg"
     spread_signal_label = f"{spread_signal} · Historical norm ~170bps"
 
-    mba_headline,mba_date = "","" 
-    for src in [mba.get("weeks",[]), mba.get("items",[])]:
-        if src: mba_headline,mba_date = src[0].get("title",""),src[0].get("date",""); break
-    mba_short = (mba_headline[:65]+"...") if len(mba_headline)>65 else mba_headline
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1012,7 +799,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
     </div>
     <div class="hmeta">
       <div>{TODAY_STR}</div>
-      <div>OBMMI · PMMS · Fannie Mae ESR · MBA · Inman · Fortune</div>
+      <div>OBMMI · PMMS · Fannie Mae ESR · Pending Sales · Inman · Fortune</div>
     </div>
     <div style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);text-align:right;">
       Auto-updated daily<br>Last run: {RUN_TS}
@@ -1112,11 +899,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
 
   <div class="two-col">
     <div>
-      <div class="slbl">MBA Application Activity · HousingWire / MBA</div>
+      <div class="slbl">Pending Home Sales · NAR via FRED</div>
       <div class="panel">
-        <div class="ph"><h3>MBA Mortgage Applications</h3><span class="badge badge-blue">MBA via HousingWire</span></div>
-        <div class="mba-section">{mba_html_str}</div>
-        <div class="sb"><div class="sd"></div><span>MBA Weekly Applications Survey · HousingWire · Updated Wednesdays · mba.org fallback</span></div>
+        <div class="ph"><h3>Pending Home Sales Index</h3><span class="badge badge-teal">FRED · NAR</span></div>
+        {pending_html_str}
+        <div class="sb"><div class="sd"></div><span>NAR Pending Home Sales via FRED · Series PENDING · Seasonally adjusted · Monthly leading indicator</span></div>
       </div>
     </div>
     <div>
@@ -1308,9 +1095,9 @@ if __name__ == "__main__":
     spread       = fetch_spread()
     news_fortune = fetch_fortune_news()
     news_inman   = fetch_inman_news()
-    mba          = fetch_mba()
+    pending      = fetch_pending()
 
-    html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, mba, spread)
+    html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread)
     html = html.replace("{LOGO_SRC}", LOGO_SRC)
 
     with open("index.html","w",encoding="utf-8") as f:
@@ -1323,5 +1110,6 @@ if __name__ == "__main__":
     print(f"  HPSI         : {hpsi['value'] if hpsi else 'N/A'}")
     print(f"  Fortune news : {len(news_fortune)} articles")
     print(f"  Inman news   : {len(news_inman)} articles")
-    print(f"  MBA weeks    : {len(mba.get('weeks',[]))}")
+    print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
     print(f"{'='*60}\n")
+
