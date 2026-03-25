@@ -57,40 +57,57 @@ _fannie_token = None
 _fannie_token_expiry = None
 
 def get_fannie_token():
+    """Authenticate with Fannie Mae Exchange APIs using AWS Cognito."""
     global _fannie_token, _fannie_token_expiry
     if _fannie_token and _fannie_token_expiry and datetime.datetime.utcnow() < _fannie_token_expiry:
         return _fannie_token
     if not FANNIE_CLIENT_ID or not FANNIE_CLIENT_SECRET:
+        print("  WARN: Fannie Mae credentials not set")
         return None
-    print("  Getting Fannie Mae OAuth token...")
-    token_endpoints = [
+
+    print("  Authenticating with Fannie Mae Exchange (Cognito)...")
+
+    # The Exchange by Fannie Mae uses AWS Cognito client credentials flow
+    # Token endpoint: https://cognito-idp.{region}.amazonaws.com/{userPoolId}/.well-known/jwks.json
+    # Auth via Cognito hosted UI token endpoint
+    import base64 as _b64
+
+    # Try the standard Cognito token endpoint with client_credentials grant
+    # The Exchange uses us-east-1 region based on their infrastructure
+    cognito_endpoints = [
+        "https://auth.theexchange.fanniemae.com/oauth2/token",
+        "https://fanniemae.auth.us-east-1.amazoncognito.com/oauth2/token",
         "https://api.fanniemae.com/v1/oauth2/token",
-        "https://devptlpub.fv7dp.etss.prod.fanniemae.com/v1/oauth2/token",
-        "https://api.fanniemae.com/oauth2/v1/token",
     ]
-    raw = None
-    for _ep in token_endpoints:
-        _r = post(_ep, {
-            "grant_type": "client_credentials",
-            "client_id": FANNIE_CLIENT_ID,
-            "client_secret": FANNIE_CLIENT_SECRET,
-        })
-        if _r:
-            raw = _r
-            print(f"  Token endpoint OK: {_ep}")
-            break
-        print(f"  Token endpoint failed: {_ep}")
-    if not raw: return None
-    try:
-        data = json.loads(raw)
-        _fannie_token = data.get("access_token")
-        exp = int(data.get("expires_in", 3600))
-        _fannie_token_expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=exp-60)
-        print(f"  Token OK, expires {exp}s")
-        return _fannie_token
-    except Exception as e:
-        print(f"  WARN token: {e}")
-        return None
+
+    # Encode client credentials as Basic Auth (standard for Cognito client_credentials)
+    creds = _b64.b64encode(f"{FANNIE_CLIENT_ID}:{FANNIE_CLIENT_SECRET}".encode()).decode()
+
+    for endpoint in cognito_endpoints:
+        print(f"  Trying: {endpoint}")
+        raw = post(endpoint, {"grant_type": "client_credentials"},
+                   headers={"Authorization": f"Basic {creds}",
+                            "Content-Type": "application/x-www-form-urlencoded"})
+        if raw:
+            try:
+                data = json.loads(raw)
+                token = data.get("access_token") or data.get("id_token")
+                if token:
+                    exp = int(data.get("expires_in", 3600))
+                    _fannie_token = token
+                    _fannie_token_expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=exp - 60)
+                    print(f"  Token OK from {endpoint} (expires {exp}s)")
+                    return _fannie_token
+                else:
+                    print(f"  No token in response from {endpoint}: {list(data.keys())}")
+            except Exception as e:
+                print(f"  Parse error from {endpoint}: {e}")
+        else:
+            print(f"  No response from {endpoint}")
+
+    print("  All Fannie Mae token endpoints failed")
+    return None
+
 
 def fannie_get(path):
     token = get_fannie_token()
@@ -348,72 +365,143 @@ def fetch_fortune_news():
     print(f"  Fortune: {len(articles)} articles")
     return articles
 
-# ── MBA / HOUSINGWIRE ─────────────────────────────────────────────────────────
+# ── MBA / PURCHASE APPLICATIONS ───────────────────────────────────────────────
 
 def fetch_mba():
-    print("Fetching MBA application data...")
+    """
+    Fetch MBA Weekly Purchase Applications data.
+    Source: Calculated Risk Blog RSS (calculatedriskblog.com/feeds/posts/default)
+      - Publishes full MBA Weekly Survey text every Wednesday
+      - We extract the PURCHASE INDEX specifically (not composite, not refi, not HPSI)
+      - The seasonally adjusted Purchase Index is the correct metric for buyer demand
+    Fallback: Inman RSS (title-only, less precise)
+    """
+    print("Fetching MBA Purchase Application data...")
     weeks, items = [], []
 
-    def parse_items(rss):
+    def extract_purchase_pct(text):
+        """
+        Extract WoW % change for the MBA Purchase Index specifically.
+        The MBA report always phrases it as:
+          "The seasonally adjusted Purchase Index increased/decreased X percent from one week earlier"
+        We target this exact phrase to avoid confusing it with:
+          - The composite Market Composite Index (total apps incl. refi)
+          - The Refinance Index
+          - Consumer sentiment (HPSI) — completely separate survey, not in this feed
+        """
+        # Primary: seasonally adjusted Purchase Index (most reliable, matches HousingWire display)
+        m = re.search(
+            r"seasonally adjusted Purchase Index (increased|decreased)\s+([\d.]+)\s*percent",
+            text, re.I
+        )
+        if m:
+            val = float(m.group(2))
+            return -val if m.group(1).lower() == "decreased" else val
+
+        # Secondary: unadjusted Purchase Index (less preferred but still purchase-specific)
+        m = re.search(
+            r"unadjusted Purchase Index (increased|decreased)\s+([\d.]+)\s*percent",
+            text, re.I
+        )
+        if m:
+            val = float(m.group(2))
+            return -val if m.group(1).lower() == "decreased" else val
+
+        return None  # Do NOT fall back to composite/title — would be wrong index
+
+    def extract_yoy_pct(text):
+        """Extract YoY % for Purchase Index (unadjusted, same week last year comparison)."""
+        m = re.search(
+            r"unadjusted Purchase Index.*?was\s+([\d.]+)\s*percent (higher|lower) than the same week one year",
+            text, re.I
+        )
+        if m:
+            val = float(m.group(1))
+            return -val if m.group(2).lower() == "lower" else val
+        return None
+
+    def extract_week_ending(text):
+        """Extract week-ending date from MBA report text."""
+        m = re.search(r"week ending\s+(\w+ \d+,?\s*\d{4})", text, re.I)
+        return m.group(1).strip() if m else ""
+
+    def parse_rss(raw, domain=None):
         found = []
+        # Capture item blocks including description/content
         for m in re.finditer(
-            r'<item>.*?<title>(.*?)</title>.*?<link>(.*?)</link>.*?<pubDate>(.*?)</pubDate>',
-            rss, re.DOTALL | re.IGNORECASE
+            r"<item>(.*?)</item>", raw, re.DOTALL | re.IGNORECASE
         ):
-            raw = m.group(1).strip()
-            url = m.group(2).strip()
-            pub = m.group(3).strip()
-            title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\\1', raw).strip()
-            title = re.sub(r'<[^>]+>', '', title).strip()
-            if not any(k in title.lower() for k in ("application","mba","purchase index")): continue
+            block = m.group(1)
+
+            title_m = re.search(r"<title>(.*?)</title>", block, re.DOTALL)
+            link_m  = re.search(r"<link>(.*?)</link>",   block, re.DOTALL)
+            pub_m   = re.search(r"<pubDate>(.*?)</pubDate>", block, re.DOTALL)
+            desc_m  = re.search(
+                r"(?:<description>|<content:encoded>)(.*?)(?:</description>|</content:encoded>)",
+                block, re.DOTALL | re.IGNORECASE
+            )
+
+            if not (title_m and link_m): continue
+
+            title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"", title_m.group(1)).strip()
+            title = re.sub(r"<[^>]+>", "", title).strip()
+            url   = link_m.group(1).strip()
+            pub   = pub_m.group(1).strip() if pub_m else ""
+
+            if domain and domain not in url: continue
+            # Must be an MBA applications post (not HPSI, not builder survey, not refi-only)
+            tl = title.lower()
+            if "mba" not in tl and "application" not in tl: continue
+            if "hpsi" in tl or "sentiment" in tl or "builder" in tl: continue
+
             try:
                 dt = datetime.datetime.strptime(pub[:25], "%a, %d %b %Y %H:%M")
                 date_str = dt.strftime("%b %d, %Y")
-            except: date_str = pub[:16]
-            pct = re.search(r'(increased|decreased|rose|fell|up|down)\s*([\d.]+)\s*%', title, re.I)
-            val = None
-            if pct:
-                val = float(pct.group(2))
-                if pct.group(1).lower() in ("decreased","fell","down"): val = -val
-            found.append({"title":title,"url":url,"date":date_str,"val":val})
+            except:
+                date_str = pub[:16]
+
+            # Get the body text to extract Purchase Index specifically
+            body = ""
+            if desc_m:
+                body = re.sub(r"<[^>]+>", " ", desc_m.group(1)).strip()
+                body = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"", body)
+
+            purchase_val = extract_purchase_pct(body)
+            yoy_val      = extract_yoy_pct(body)
+            week_end     = extract_week_ending(body)
+
+            found.append({
+                "title":    title,
+                "url":      url,
+                "date":     date_str,
+                "val":      purchase_val,   # seasonally adj. Purchase Index WoW %
+                "yoy":      yoy_val,        # YoY % (unadjusted purchase)
+                "week_end": week_end,
+            })
         return found
 
-    # Try Inman RSS (publicly accessible, sometimes covers MBA data)
-    print("  Trying Inman RSS...")
-    rss = fetch("https://feeds.feedburner.com/inmannews")
-    if rss:
-        for f in parse_items(rss):
+    # Primary: Calculated Risk Blog RSS
+    raw = fetch("https://www.calculatedriskblog.com/feeds/posts/default")
+    if raw:
+        found = parse_rss(raw, "calculatedriskblog.com")
+        for f in found:
             items.append(f)
-            if f["val"] is not None: weeks.append(f)
+            if f["val"] is not None:
+                weeks.append(f)
+        print(f"  Calculated Risk: {len(found)} MBA posts, {len(weeks)} with purchase val")
 
-    # Try HousingWire RSS
-    print("  Trying HousingWire RSS...")
-    rss = fetch("https://www.housingwire.com/feed/")
-    if rss:
-        for f in parse_items(rss):
-            if not any(i["title"]==f["title"] for i in items):
+    # Fallback: Inman (titles only — no body, so purchase val will always be None here)
+    if not items:
+        raw = fetch("https://feeds.feedburner.com/inmannews")
+        if raw:
+            for f in parse_rss(raw):
                 items.append(f)
-                if f["val"] is not None: weeks.append(f)
+                if f["val"] is not None:
+                    weeks.append(f)
+            print(f"  Inman fallback: {len(items)} items")
 
-    # Try MBA newsroom directly
-    print("  Trying MBA newsroom...")
-    html = fetch("https://www.mba.org/news-research-and-resources/research-and-economics/single-family-research/weekly-applications-survey")
-    if html:
-        text = re.sub(r'<[^>]+>', ' ', html)
-        pm = re.findall(r'(increased|decreased)\s+([\d.]+)\s*percent', text, re.I)
-        dm = re.findall(r'week ending\s+(\w+ \d+,?\s*\d{4})', text, re.I)
-        if pm:
-            val = float(pm[0][1])
-            if pm[0][0].lower() == "decreased": val = -val
-            dstr = dm[0] if dm else TODAY_STR
-            entry = {"title": f"MBA: Applications {pm[0][0]} {pm[0][1]}% week ending {dstr}",
-                     "url": "https://www.mba.org/news-research-and-resources/research-and-economics/single-family-research/weekly-applications-survey",
-                     "date": dstr, "val": val}
-            weeks.append(entry)
-            items.append(entry)
-
-    print(f"  MBA: {len(weeks)} weeks, {len(items)} items")
-    return {"weeks":weeks[:3],"items":items[:3]}
+    print(f"  MBA purchase index: {len(weeks)} with values, {len(items)} items total")
+    return {"weeks": weeks[:3], "items": items[:3]}
 
 
 def build_news_items(articles, show_desc=False):
@@ -544,12 +632,19 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
 
     home_sales   = f"~{housing.get('total_home_sales')}M" if housing.get("total_home_sales") else "~5.5M"
     sf_starts    = f"{housing.get('sf_starts'):+.1f}%" if housing.get("sf_starts") is not None else "−6.2%"
-    gdp          = f"{economic.get('gdp'):.1f}%" if economic.get("gdp") else "N/A"
-    unemployment = f"{economic.get('unemployment'):.1f}%" if economic.get("unemployment") else "N/A"
-    cpi          = f"{economic.get('cpi'):.1f}%" if economic.get("cpi") else "N/A"
-    treasury10y  = f"{economic.get('treasury_10y'):.2f}%" if economic.get("treasury_10y") else "N/A"
-    hpsi_val     = f"{hpsi['value']}" if hpsi else "N/A"
-    hpsi_date    = hpsi["date"] if hpsi else ""
+    # Use live Fannie Mae API data if available, otherwise fall back to latest known values
+    # Fallbacks from Fannie Mae March 2026 ESR report
+    gdp          = f"{economic.get('gdp'):.1f}%"          if economic.get("gdp")          else "~2.3%"
+    unemployment = f"{economic.get('unemployment'):.1f}%"  if economic.get("unemployment")  else "~4.2%"
+    cpi          = f"{economic.get('cpi'):.1f}%"           if economic.get("cpi")           else "~2.7%"
+    treasury10y  = f"{economic.get('treasury_10y'):.2f}%"  if economic.get("treasury_10y")  else "~4.3%"
+    hpsi_val     = f"{hpsi['value']}" if hpsi else "~73"
+    hpsi_date    = hpsi["date"] if hpsi else "Feb 2026"
+    # Mark as estimated if from fallback
+    gdp_src      = "Live · Fannie Mae API" if economic.get("gdp") else "Est. · Fannie Mae Mar 2026"
+    unemp_src    = "Live · Fannie Mae API" if economic.get("unemployment") else "Est. · Fannie Mae Mar 2026"
+    cpi_src      = "Live · Fannie Mae API" if economic.get("cpi") else "Est. · Fannie Mae Mar 2026"
+    tsy_src      = "Live · Fannie Mae API" if economic.get("treasury_10y") else "Est. · Fannie Mae Mar 2026"
 
     fannie_date = housing.get("report_date") or economic.get("report_date") or "Latest"
     try:
@@ -771,10 +866,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
       <div class="st-chg {yoy_cls}">{yoy_label}</div>
     </div>
     <div class="stat-tile">
-      <div class="st-label">HPSI Sentiment</div>
-      <div class="st-val">{hpsi_val}</div>
-      <div class="st-sub">Fannie Mae HPSI · {hpsi_date}</div>
-      <div class="st-chg pos">Home Purchase Sentiment Index</div>
+      <div class="st-label">MBA Applications</div>
+      <div class="st-val" style="font-size:1.3rem;line-height:1.2;">{mba_short}</div>
+      <div class="st-sub">{mba_date}</div>
+      <div class="st-chg pos">Weekly MBA Survey · HousingWire</div>
     </div>
   </div>
 
@@ -828,9 +923,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
     <div>
       <div class="slbl">MBA Application Activity · HousingWire / MBA</div>
       <div class="panel">
-        <div class="ph"><h3>Mortgage Purchase Applications</h3><span class="badge badge-blue">MBA via HousingWire</span></div>
+        <div class="ph"><h3>MBA Mortgage Applications</h3><span class="badge badge-blue">MBA via Calculated Risk</span></div>
         <div class="mba-section">{mba_html_str}</div>
-        <div class="sb"><div class="sd"></div><span>MBA Weekly Mortgage Applications Survey via HousingWire · Updated Wednesdays</span></div>
+        <div class="sb"><div class="sd"></div><span>MBA Weekly Applications Survey via Calculated Risk Blog · calculatedriskblog.com · Updated Wednesdays</span></div>
       </div>
     </div>
     <div>
@@ -893,35 +988,39 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, m
           <div class="econ-cell">
             <div class="ec-label">GDP Growth</div>
             <div class="ec-val">{gdp}</div>
-            <div class="ec-sub">EOY {TODAY.year} Forecast</div>
+            <div class="ec-sub">{gdp_src}</div>
           </div>
           <div class="econ-cell">
             <div class="ec-label">Unemployment</div>
             <div class="ec-val">{unemployment}</div>
-            <div class="ec-sub">EOY {TODAY.year} Forecast</div>
+            <div class="ec-sub">{unemp_src}</div>
           </div>
           <div class="econ-cell">
             <div class="ec-label">CPI Inflation</div>
             <div class="ec-val">{cpi}</div>
-            <div class="ec-sub">EOY {TODAY.year} Forecast</div>
+            <div class="ec-sub">{cpi_src}</div>
           </div>
           <div class="econ-cell">
             <div class="ec-label">10-Yr Treasury</div>
             <div class="ec-val">{treasury10y}</div>
-            <div class="ec-sub">EOY {TODAY.year} Forecast</div>
+            <div class="ec-sub">{tsy_src}</div>
           </div>
         </div>
       </div>
       <div class="sb"><div class="sd"></div><span>Fannie Mae Economic Indicators API · {fannie_date}</span></div>
     </div>
     <div class="panel">
-      <div class="ph"><h3>Consumer Sentiment · HPSI</h3><span class="badge badge-gold">Fannie Mae API</span></div>
-      <div style="padding:1.25rem;">
-        <div style="font-size:3.5rem;font-weight:800;line-height:1;margin-bottom:.35rem;color:var(--nz-blue);">{hpsi_val}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:.54rem;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem;letter-spacing:.07em;">Home Purchase Sentiment · {hpsi_date}</div>
-        <p style="font-size:.72rem;line-height:1.65;color:var(--muted);">Monthly National Housing Survey of 1,000 consumers distilled into a single forward-looking indicator. Higher = more positive sentiment toward buying a home.</p>
+      <div class="ph"><h3>Market Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
+      <div style="padding:1rem 1.25rem;">
+        <div style="font-size:.73rem;line-height:1.75;color:var(--muted);">
+          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Slower GDP growth forecast — weaker economy supports lower rates but signals demand risk</div>
+          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Limited inventory despite lower rates — prices stay elevated, affordability constrained</div>
+          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Geopolitical events pushing oil &amp; Treasury yields higher near-term</div>
+          <div style="margin-bottom:.5rem;"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Single-family starts forecast −6.2% YoY — supply constraints persist</div>
+          <div><span style="color:var(--nz-teal);font-weight:700;">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers better positioned than 2025</div>
+        </div>
       </div>
-      <div class="sb"><div class="sd"></div><span>Fannie Mae NHS API · /v1/nhs/hpsi · Monthly</span></div>
+      <div class="sb"><div class="sd"></div><span>Fannie Mae ESR Group · {fannie_date} Economic Forecast</span></div>
     </div>
   </div>
 
@@ -1006,3 +1105,4 @@ if __name__ == "__main__":
     print(f"  Inman news   : {len(news_inman)} articles")
     print(f"  MBA weeks    : {len(mba.get('weeks',[]))}")
     print(f"{'='*60}\n")
+
