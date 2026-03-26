@@ -2,7 +2,7 @@ name: Update PropertyPulse Daily
 
 on:
   schedule:
-    # Runs every day at 9:00 AM ET (13:00 UTC)
+    # Runs every day at 9:00 AM ET (13:00 UTC) — schedule activated
     - cron: '0 13 * * *'
   workflow_dispatch:   # also allows manual trigger from GitHub Actions tab
 
