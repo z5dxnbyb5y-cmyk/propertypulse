@@ -530,47 +530,94 @@ def fetch_redfin_market():
 
 def fetch_zillow_market():
     """
-    Pull Zillow Home Value Index (ZHVI) — national typical home value.
-    File: files.zillowstatic.com/research/public_csvs/zhvi/
-    National level: filter rows where RegionName == "United States".
+    Pull Zillow Home Value Index (ZHVI) — national + all 50 state values.
+    File: State_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv
+    Returns national dict plus state_data dict keyed by 2-letter abbreviation.
     Updated monthly on the 16th.
     """
-    print("Fetching Zillow ZHVI national home value...")
-    # National-level ZHVI all-home types smoothed seasonally adjusted
-    url = "https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+    print("Fetching Zillow ZHVI national + state home values...")
+    # State-level ZHVI (also contains national row)
+    url_state = "https://files.zillowstatic.com/research/public_csvs/zhvi/State_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
     fallback = {
         "zhvi": 359000, "zhvi_mom": 0.3, "zhvi_yoy": 3.2,
         "period": "2026-01", "source": "fallback",
+        "state_data": {},
     }
+
+    # State name → abbreviation mapping
+    STATE_ABBR = {
+        "Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA",
+        "Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA",
+        "Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA",
+        "Kansas":"KS","Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD",
+        "Massachusetts":"MA","Michigan":"MI","Minnesota":"MN","Mississippi":"MS",
+        "Missouri":"MO","Montana":"MT","Nebraska":"NE","Nevada":"NV","New Hampshire":"NH",
+        "New Jersey":"NJ","New Mexico":"NM","New York":"NY","North Carolina":"NC",
+        "North Dakota":"ND","Ohio":"OH","Oklahoma":"OK","Oregon":"OR","Pennsylvania":"PA",
+        "Rhode Island":"RI","South Carolina":"SC","South Dakota":"SD","Tennessee":"TN",
+        "Texas":"TX","Utah":"UT","Vermont":"VT","Virginia":"VA","Washington":"WA",
+        "West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY","District of Columbia":"DC",
+    }
+
+    def _parse_zhvi_row(row, date_cols):
+        try:
+            v_now  = float(row[date_cols[-1]])
+            v_prev = float(row[date_cols[-2]])
+            v_yago = float(row[date_cols[-13]])
+            mom = round((v_now - v_prev) / v_prev * 100, 2)
+            yoy = round((v_now - v_yago) / v_yago * 100, 1)
+            return {"zhvi": round(v_now), "zhvi_mom": mom, "zhvi_yoy": yoy, "period": date_cols[-1][:7]}
+        except:
+            return None
+
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        req = urllib.request.Request(url_state, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
             raw = resp.read().decode("utf-8")
         reader = csv.DictReader(io.StringIO(raw))
-        national_row = None
-        for row in reader:
-            if row.get("RegionName", "").lower() == "united states":
-                national_row = row
-                break
-        if not national_row:
-            print("  Zillow: United States row not found, using fallback")
+        rows = list(reader)
+        if not rows:
+            print("  Zillow: empty CSV, using fallback")
             return fallback
-        # Get last two date columns for MoM, and ~12 months ago for YoY
-        date_cols = [k for k in national_row.keys() if re.match(r'\d{4}-\d{2}-\d{2}', k)]
-        date_cols.sort()
+
+        date_cols = sorted([k for k in rows[0].keys() if re.match(r'\d{4}-\d{2}-\d{2}', k)])
         if len(date_cols) < 13:
             return fallback
-        latest_col  = date_cols[-1]
-        prev_col    = date_cols[-2]
-        yago_col    = date_cols[-13]
-        v_now  = float(national_row[latest_col])
-        v_prev = float(national_row[prev_col])
-        v_yago = float(national_row[yago_col])
-        mom = round((v_now - v_prev) / v_prev * 100, 2)
-        yoy = round((v_now - v_yago) / v_yago * 100, 1)
-        period = latest_col[:7]
-        print(f"  Zillow ZHVI: ${v_now:,.0f} ({mom:+.2f}% MoM, {yoy:+.1f}% YoY) as of {period}")
-        return {"zhvi": round(v_now), "zhvi_mom": mom, "zhvi_yoy": yoy, "period": period, "source": "zillow"}
+
+        national_data = None
+        state_data = {}
+
+        for row in rows:
+            name = row.get("RegionName", "").strip()
+            parsed = _parse_zhvi_row(row, date_cols)
+            if not parsed:
+                continue
+            if name.lower() == "united states":
+                national_data = parsed
+            abbr = STATE_ABBR.get(name)
+            if abbr:
+                state_data[abbr] = {**parsed, "name": name}
+
+        if not national_data:
+            # Fall back to metro CSV for national row
+            print("  Zillow: no national row in state CSV, trying metro CSV...")
+            url_nat = "https://files.zillowstatic.com/research/public_csvs/zhvi/Metro_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv"
+            req2 = urllib.request.Request(url_nat, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
+            with urllib.request.urlopen(req2, timeout=25) as resp2:
+                raw2 = resp2.read().decode("utf-8")
+            for row in csv.DictReader(io.StringIO(raw2)):
+                if row.get("RegionName", "").lower() == "united states":
+                    dcols2 = sorted([k for k in row.keys() if re.match(r'\d{4}-\d{2}-\d{2}', k)])
+                    national_data = _parse_zhvi_row(row, dcols2) if len(dcols2) >= 13 else None
+                    break
+
+        if not national_data:
+            return {**fallback, "state_data": state_data}
+
+        period = national_data["period"]
+        print(f"  Zillow ZHVI: ${national_data['zhvi']:,} ({national_data['zhvi_yoy']:+.1f}% YoY) as of {period} · {len(state_data)} states")
+        return {**national_data, "source": "zillow", "state_data": state_data}
+
     except Exception as e:
         print(f"  Zillow: fetch failed ({e}), using fallback")
         return fallback
@@ -1114,7 +1161,7 @@ def _summary_fallback(rates, pmms, spread, pending, redfin_market=None):
 
 # ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
-def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread, redfin_market=None, zillow_market=None):
+def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread, redfin_market=None, zillow_market=None, state_data=None):
     rates_json     = json.dumps(rates)
     fortune_html   = build_news_items(news_fortune)
     inman_html     = build_news_items(news_inman, show_desc=True)
@@ -1125,6 +1172,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     redfin_market  = redfin_market or {}
     zillow_market  = zillow_market or {}
     pulse_html     = build_housing_pulse_html(redfin_market, zillow_market)
+    map_html       = build_us_map_html(state_data or {})
 
     r30   = pmms.get("rate_30y") or 0
     r15   = pmms.get("rate_15y") or 0
@@ -1205,7 +1253,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     --gold:#D4943A;
   }}
   *{{box-sizing:border-box;margin:0;padding:0}}
-  body{{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px}}
+  body{{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:clamp(13px,1.5vw,15px)}}
   a{{color:inherit;text-decoration:none}}
 
   /* HEADER + NAV — merged into one sticky bar */
@@ -1233,17 +1281,16 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   /* chup/chdn still used elsewhere */
   .chup{{color:var(--nz-teal)}}.chdn{{color:var(--nz-red)}}
 
-  /* LAYOUT */
-  main{{max-width:1280px;margin:0 auto;padding:1.75rem 1.5rem}}
+  main{{max-width:1280px;margin:0 auto;padding:clamp(1rem,3vw,1.75rem) clamp(.75rem,2vw,1.5rem)}}
   .section-hd{{display:flex;align-items:center;gap:1rem;margin:2.5rem 0 1.25rem;padding:.9rem 1.25rem;border-radius:8px;border-left:4px solid var(--nz-blue);background:var(--nz-blue-light)}}
-  .section-hd-label{{font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;color:var(--nz-blue);letter-spacing:.01em}}
+  .section-hd-label{{font-family:'Inter',sans-serif;font-size:clamp(.75rem,1.2vw,.85rem);font-weight:700;color:var(--nz-blue);letter-spacing:.01em}}
   .section-hd-blue{{border-left-color:var(--nz-blue);background:var(--nz-blue-light)}}
   .section-hd-blue .section-hd-label{{color:var(--nz-blue)}}
   .section-hd-teal{{border-left-color:var(--nz-teal-bright);background:var(--nz-teal-bright-light)}}
   .section-hd-teal .section-hd-label{{color:var(--nz-teal-bright)}}
   .section-hd-yellow{{border-left-color:var(--nz-yellow);background:var(--nz-yellow-light)}}
   .section-hd-yellow .section-hd-label{{color:#9A7800}}
-  .slbl{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}}
+  .slbl{{font-family:'DM Mono',monospace;font-size:clamp(.52rem,.8vw,.6rem);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}}
   .slbl::after{{content:'';flex:1;height:1px;background:var(--border)}}
   .slbl-blue{{color:var(--nz-blue)}}.slbl-blue::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--nz-blue);flex-shrink:0}}
   .slbl-teal{{color:var(--nz-teal-bright)}}.slbl-teal::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--nz-teal-bright);flex-shrink:0}}
@@ -1251,6 +1298,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}}
   .three-col{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-bottom:2rem}}
   @media(max-width:860px){{.two-col,.three-col{{grid-template-columns:1fr}}}}
+  @media(max-width:480px){{.two-col{{gap:1rem}}}}
 
   /* ALERT BANNER */
   .fed-note{{background:var(--nz-blue);color:white;padding:1rem 1.5rem;margin-bottom:2rem;border-radius:8px;display:flex;gap:1.25rem;align-items:flex-start}}
@@ -1283,10 +1331,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .hp-signal-cool .hp-signal-label{{color:var(--nz-blue)}}
   .hp-signal-desc{{font-size:.72rem;color:var(--ink);line-height:1.5}}
   .hp-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin:0 0 0 0}}
-  @media(max-width:700px){{.hp-grid{{grid-template-columns:repeat(2,1fr)}}}}
+  @media(max-width:800px){{.hp-grid{{grid-template-columns:repeat(2,1fr)}}}}
+  @media(max-width:400px){{.hp-grid{{grid-template-columns:1fr}}}}
   .hp-cell{{background:white;padding:.85rem 1.25rem}}
   .hp-metric{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}}
-  .hp-val{{font-size:1.05rem;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:.3rem}}
+  .hp-val{{font-size:clamp(.9rem,1.5vw,1.05rem);font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:.3rem}}
   .hp-badge{{font-family:'DM Mono',monospace;font-size:.54rem;padding:.15rem .45rem;border-radius:4px;font-weight:500}}
   .hp-good{{background:var(--nz-teal-light);color:var(--nz-teal)}}
   .hp-bad{{background:var(--nz-red-light);color:var(--nz-red)}}
@@ -1294,41 +1343,52 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   /* STAT TILES */
   .stat-tiles{{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}}
-  @media(max-width:700px){{.stat-tiles{{grid-template-columns:repeat(2,1fr)}}}}
+  @media(max-width:900px){{.stat-tiles{{grid-template-columns:repeat(2,1fr)}}}}
+  @media(max-width:480px){{.stat-tiles{{grid-template-columns:1fr}}}}
   .stat-tile{{background:white;border:1px solid var(--border);border-radius:8px;padding:1.1rem 1.25rem;position:relative;overflow:hidden}}
   .stat-tile::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--nz-teal-bright)}}
   .st-label{{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem}}
-  .st-val{{font-size:1.9rem;font-weight:700;line-height:1;margin-bottom:.2rem;color:var(--ink)}}
+  .st-val{{font-size:clamp(1.4rem,2.5vw,1.9rem);font-weight:700;line-height:1;margin-bottom:.2rem;color:var(--ink)}}
   .st-sub{{font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted)}}
   .st-chg{{font-family:'DM Mono',monospace;font-size:.6rem;margin-top:.25rem}}
   .st-chg.neg{{color:var(--nz-red)}}.st-chg.pos{{color:var(--nz-teal)}}
 
   /* RATE CARDS */
   .rate-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem}}
-  @media(min-width:500px){{.rate-grid{{grid-template-columns:repeat(3,1fr)}}}}
-  @media(min-width:900px){{.rate-grid{{grid-template-columns:repeat(6,1fr)}}}}
+  @media(min-width:600px){{.rate-grid{{grid-template-columns:repeat(3,1fr)}}}}
+  @media(min-width:1000px){{.rate-grid{{grid-template-columns:repeat(6,1fr)}}}}
   .rate-card{{background:white;border:1px solid var(--border);border-radius:8px;padding:1rem 1.1rem;position:relative;overflow:hidden;transition:box-shadow .2s}}
   .rate-card:hover{{box-shadow:0 4px 16px rgba(76,109,225,.12)}}
   .rate-card::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--nz-teal)}}
   .rc-label{{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}}
-  .rc-value{{font-size:1.65rem;font-weight:700;line-height:1;margin-bottom:.2rem;color:var(--ink)}}
+  .rc-value{{font-size:clamp(1.2rem,2vw,1.65rem);font-weight:700;line-height:1;margin-bottom:.2rem;color:var(--ink)}}
   .rc-chg{{font-family:'DM Mono',monospace;font-size:.58rem}}.rc-chg.up{{color:var(--nz-red)}}.rc-chg.dn{{color:var(--nz-teal)}}
   .rc-prev{{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:.15rem}}
 
   /* PANELS */
-  .panel{{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden}}
-  .ph{{padding:.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--paper)}}
-  .ph h3{{font-size:.88rem;font-weight:600;color:var(--ink)}}
+  .panel{{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative}}
+  .panel::before{{content:'';display:block;height:4px;background:var(--nz-blue)}}
+  .panel-teal::before{{background:var(--nz-teal-bright)}}
+  .panel-yellow::before{{background:var(--nz-yellow)}}
+  .panel-blue::before{{background:var(--nz-blue)}}
+  .ph{{padding:.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--nz-blue-light)}}
+  .panel-teal .ph{{background:var(--nz-teal-bright-light)}}
+  .panel-yellow .ph{{background:var(--nz-yellow-light)}}
+  .ph h3{{font-size:clamp(.8rem,1.1vw,.9rem);font-weight:600;color:var(--ink)}}
   .badge{{font-family:'DM Mono',monospace;font-size:.52rem;padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}}
-  .badge-blue{{background:var(--nz-blue-light);color:var(--nz-blue)}}
-  .badge-teal{{background:var(--nz-teal-light);color:var(--nz-teal)}}
+  .badge-blue{{background:rgba(76,109,225,.15);color:var(--nz-blue)}}
+  .badge-teal{{background:rgba(62,180,165,.15);color:var(--nz-teal)}}
   .badge-gold{{background:#FDF3E3;color:var(--gold)}}
   .badge-red{{background:var(--nz-red-light);color:var(--nz-red)}}
   .sb{{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted)}}
   .sd{{width:5px;height:5px;border-radius:50%;background:var(--nz-teal);flex-shrink:0}}
 
   /* TABLES */
-  .tbl-wrap{{background:white;border:1px solid var(--border);border-radius:8px;margin-bottom:2rem;overflow:hidden}}
+  .tbl-wrap{{background:white;border:1px solid var(--border);border-radius:8px;margin-bottom:2rem;overflow:hidden;position:relative}}
+  .tbl-wrap::before{{content:'';display:block;height:4px;background:var(--nz-blue)}}
+  .tbl-wrap-teal::before{{background:var(--nz-teal-bright)}}
+  .tbl-wrap .ph{{background:var(--nz-blue-light)}}
+  .tbl-wrap-teal .ph{{background:var(--nz-teal-bright-light)}}
   table{{width:100%;border-collapse:collapse;font-size:.78rem}}
   thead th{{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:.65rem 1.25rem;text-align:left;border-bottom:1px solid var(--border);background:var(--paper);white-space:nowrap}}
   tbody tr{{border-bottom:1px solid var(--border);transition:background .15s}}
@@ -1346,7 +1406,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .pmms-strip{{display:flex;gap:1px;background:var(--border)}}
   .pmms-cell{{flex:1;background:white;padding:.85rem 1rem}}
   .pmms-lbl{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}}
-  .pmms-val{{font-size:1.3rem;font-weight:700;line-height:1;color:var(--ink)}}
+  .pmms-val{{font-size:clamp(1rem,2vw,1.3rem);font-weight:700;line-height:1;color:var(--ink)}}
   .pmms-sub{{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}}
 
   /* MBA */
@@ -1379,20 +1439,22 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .econ-grid{{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border-radius:0 0 8px 8px;overflow:hidden}}
   .econ-cell{{background:white;padding:.85rem 1.1rem}}
   .ec-label{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.25rem;letter-spacing:.06em}}
-  .ec-val{{font-size:1.4rem;font-weight:700;color:var(--ink);line-height:1;margin-bottom:.15rem}}
+  .ec-val{{font-size:clamp(1.1rem,2vw,1.4rem);font-weight:700;color:var(--ink);line-height:1;margin-bottom:.15rem}}
   .ec-sub{{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted)}}
 
   footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);line-height:1.8;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}}
   .footer-logo img{{height:18px;opacity:.5}}
 </style>
 </head>
-<body>
+<body id="top">
 
 <div class="topbar">
   <div class="topbar-inner">
     <div class="logo-wrap">
-      <img src="{{LOGO_SRC}}" alt="Newzip">
-      <div class="header-title">Market Tracker</div>
+      <a href="#top" style="display:flex;align-items:center;gap:.75rem;text-decoration:none;">
+        <img src="{{LOGO_SRC}}" alt="Newzip">
+        <div class="header-title">Market Tracker</div>
+      </a>
     </div>
     <nav class="nav-inner">
       <a class="nav-link nav-re" href="#real-estate">RE Market</a>
@@ -1437,6 +1499,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
+  <!-- ── STATE MAP ──────────────────────────────────────────────────────────── -->
+  {map_html}
+
   <!-- ══════════════════════════════════════════════════════════════════════
        SECTION 1 — REAL ESTATE MARKET TRENDS
        Redfin/Zillow pulse · Existing Sales · Housing Outlook · Econ · Risk
@@ -1446,7 +1511,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   </div>
 
   <div class="slbl slbl-blue" id="housing-pulse">Housing Market Pulse · Redfin &amp; Zillow Data</div>
-  <div class="panel" style="margin-bottom:2rem;overflow:hidden;padding:0;">
+  <div class="panel panel-blue" style="margin-bottom:2rem;overflow:hidden;padding:0;">
     <div class="ph"><h3>National Housing Market Conditions</h3><span class="badge badge-teal">Redfin · Zillow</span></div>
     {pulse_html}
   </div>
@@ -1454,7 +1519,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <div class="two-col">
     <div>
       <div class="slbl slbl-blue" id="home-sales">Existing Home Sales · NAR via FRED</div>
-      <div class="panel">
+      <div class="panel panel-blue">
         <div class="ph"><h3>Existing Home Sales</h3><span class="badge badge-teal">FRED · NAR</span></div>
         {pending_html_str}
         <div class="sb"><div class="sd"></div><span>NAR Existing Home Sales via FRED · Series EXHOSLUSM495S · Millions SAAR · Released monthly</span></div>
@@ -1462,7 +1527,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
     <div>
       <div class="slbl slbl-blue" id="outlook">Fannie Mae ESR · Housing &amp; Economic Outlook · {fannie_date}</div>
-      <div class="panel" style="height:100%;box-sizing:border-box;">
+      <div class="panel panel-blue" style="height:100%;box-sizing:border-box;">
         <div class="ph"><h3>Housing Market Outlook</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
         <div style="padding:1rem 1.25rem;">
           <div class="econ-grid" style="margin-bottom:.85rem;border:1px solid var(--border);border-radius:6px;">
@@ -1506,7 +1571,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   </div>
 
   <div class="slbl slbl-blue">Market Risk Factors · Fannie Mae ESR · {fannie_date}</div>
-  <div class="panel" style="margin-bottom:2rem;">
+  <div class="panel panel-blue" style="margin-bottom:2rem;">
     <div class="ph"><h3>Market Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
     <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem 2rem;">
       <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Slower GDP growth forecast — weaker economy supports lower rates but signals demand risk</div>
@@ -1558,7 +1623,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <div class="rate-grid" id="rate-grid"></div>
 
   <div class="slbl slbl-teal">Full OBMMI Rate Comparison · {obmmi_date}</div>
-  <div class="tbl-wrap">
+  <div class="tbl-wrap tbl-wrap-teal">
     <div class="ph"><h3>Optimal Blue Mortgage Market Indices (OBMMI)</h3><span class="badge badge-blue">FRED API · OBMMI</span></div>
     <table>
       <thead><tr><th>Loan Type</th><th>Current Rate</th><th>Prior Period</th><th>Change (bps)</th><th>Trend</th></tr></thead>
@@ -1568,7 +1633,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   </div>
 
   <div class="slbl slbl-teal" id="pmms">Freddie Mac PMMS · Via FRED API</div>
-  <div class="panel" style="margin-bottom:2rem;">
+  <div class="panel panel-teal" style="margin-bottom:2rem;">
     <div class="ph"><h3>Primary Mortgage Market Survey — Weekly Rates</h3><span class="badge badge-teal">Freddie Mac · FRED</span></div>
     <div class="pmms-strip">
       <div class="pmms-cell">
@@ -1603,7 +1668,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <div class="two-col">
     <div>
       <div class="slbl slbl-teal" id="forecast">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
-      <div class="tbl-wrap" style="margin-bottom:0;">
+      <div class="tbl-wrap tbl-wrap-teal" style="margin-bottom:0;">
         <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">Fannie Mae API</span></div>
         <table class="ftable">
           <thead><tr><th>Period</th><th>Forecast</th><th>Source</th><th>Signal</th></tr></thead>
@@ -1614,7 +1679,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
     <div>
       <div class="slbl slbl-teal" id="spread">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
-      <div class="panel" style="margin-bottom:0;">
+      <div class="panel panel-teal" style="margin-bottom:0;">
         <div class="ph"><h3>30Y Mortgage / 10Y Treasury Spread</h3><span class="badge badge-blue">FRED API</span></div>
         <div class="pmms-strip" style="flex-wrap:wrap;">
           <div class="pmms-cell">
@@ -1653,7 +1718,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <div class="two-col">
     <div>
       <div class="slbl slbl-yellow">Inman Real Estate News</div>
-      <div class="panel">
+      <div class="panel panel-yellow">
         <div class="ph"><h3>Inman Real Estate News</h3><span class="badge badge-blue">Inman</span></div>
         {inman_html}
         <div class="sb"><div class="sd"></div><span>feeds.feedburner.com/inmannews · Auto-refreshed daily</span></div>
@@ -1661,7 +1726,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
     <div>
       <div class="slbl slbl-yellow" id="housing-news">Housing Market News · Mortgage News Daily</div>
-      <div class="panel">
+      <div class="panel panel-yellow">
         <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">Mortgage News Daily</span></div>
         {fortune_html}
         <div class="sb"><div class="sd"></div><span>mortgagenewsdaily.com · Mortgage &amp; housing industry news · Auto-refreshed daily</span></div>
@@ -1724,6 +1789,297 @@ document.getElementById('rate-tbody').innerHTML = RATES.map(renderRow).join('');
 </body>
 </html>"""
 
+# ── US SVG MAP ────────────────────────────────────────────────────────────────
+
+def build_us_map_html(state_data):
+    """
+    Build a compact clickable SVG map of the US for the national page.
+    States with ZHVI data are colored by YoY change; clicking navigates to state page.
+    """
+    # State paths use a simplified Albers USA projection layout
+    # Each state: (abbr, cx, cy) for label placement, path is simplified
+    STATE_POSITIONS = {
+        "AL":(520,310),"AK":(140,390),"AZ":(200,290),"AR":(490,290),"CA":(120,240),
+        "CO":(280,240),"CT":(680,165),"DE":(665,200),"FL":(570,360),"GA":(555,310),
+        "HI":(240,410),"ID":(195,165),"IL":(510,215),"IN":(535,210),"IA":(465,195),
+        "KS":(400,255),"KY":(545,245),"LA":(490,335),"ME":(700,135),"MD":(650,210),
+        "MA":(690,160),"MI":(540,175),"MN":(455,155),"MS":(510,320),"MO":(480,245),
+        "MT":(245,140),"NE":(390,215),"NV":(165,225),"NH":(688,148),"NJ":(668,190),
+        "NM":(265,295),"NY":(645,165),"NC":(590,270),"ND":(385,140),"OH":(565,205),
+        "OK":(415,290),"OR":(145,170),"PA":(625,190),"RI":(693,168),"SC":(575,300),
+        "SD":(390,170),"TN":(530,275),"TX":(390,340),"UT":(220,240),"VT":(672,143),
+        "VA":(615,235),"WA":(160,135),"WV":(590,220),"WI":(500,170),"WY":(265,195),
+        "DC":(648,218),
+    }
+
+    def _color(yoy):
+        if yoy is None: return "#D1D5DB"
+        if yoy >= 6:    return "#005E53"
+        if yoy >= 4:    return "#3EB4A5"
+        if yoy >= 2:    return "#A7D9D4"
+        if yoy >= 0:    return "#D4EAE8"
+        if yoy >= -2:   return "#FAE8E8"
+        return "#D64045"
+
+    # Build state circles + labels
+    circles = []
+    for abbr, (cx, cy) in STATE_POSITIONS.items():
+        sd = state_data.get(abbr, {})
+        zhvi = sd.get("zhvi")
+        yoy  = sd.get("zhvi_yoy")
+        color = _color(yoy)
+        has_data = zhvi is not None
+        href = f"states/{abbr}.html" if has_data else "#"
+        cursor = "pointer" if has_data else "default"
+        tip = f"{abbr}: ${zhvi:,} ({yoy:+.1f}% YoY)" if has_data else abbr
+        circles.append(
+            f'<a href="{href}" title="{tip}">'
+            f'<circle cx="{cx}" cy="{cy}" r="14" fill="{color}" stroke="white" stroke-width="1.5" '
+            f'style="cursor:{cursor}" class="state-dot"/>'
+            f'<text x="{cx}" y="{cy+4}" text-anchor="middle" '
+            f'font-family="DM Mono,monospace" font-size="7" font-weight="600" fill="{"white" if yoy is not None and (yoy >= 2 or yoy < -2) else "#374151"}" '
+            f'style="pointer-events:none">{abbr}</text>'
+            f'</a>'
+        )
+
+    # Legend
+    legend_items = [
+        ("#005E53","≥6% YoY"),("#3EB4A5","4–6%"),("#A7D9D4","2–4%"),
+        ("#D4EAE8","0–2%"),("#FAE8E8","0 to −2%"),("#D64045","<−2%"),("#D1D5DB","No data"),
+    ]
+    legend_els = []
+    for i,(col,lbl) in enumerate(legend_items):
+        lx = 50 + i*95
+        legend_els.append(
+            f'<rect x="{lx}" y="445" width="12" height="12" rx="2" fill="{col}" stroke="white" stroke-width="0.5"/>'
+            f'<text x="{lx+16}" y="455" font-family="DM Mono,monospace" font-size="8" fill="#6B7280">{lbl}</text>'
+        )
+
+    return f"""
+<div class="panel" style="margin-bottom:2rem;overflow:hidden;padding:0;" id="state-map">
+  <div class="ph" style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);">
+    <div>
+      <h3 style="color:#1a1a2e;">Explore by State</h3>
+      <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:#6B7280;margin-top:.2rem;">Click any state to view local market data · Zillow ZHVI YoY change</div>
+    </div>
+    <span class="badge badge-blue">Zillow ZHVI</span>
+  </div>
+  <div style="background:white;padding:1rem 1.5rem;">
+    <svg viewBox="0 50 760 430" xmlns="http://www.w3.org/2000/svg"
+         style="width:100%;max-width:760px;display:block;margin:0 auto;">
+      {''.join(circles)}
+      {''.join(legend_els)}
+    </svg>
+  </div>
+  <div class="sb"><div class="sd" style="background:#4C6DE1;"></div><span>Zillow ZHVI · State-level home values · Click a state to view detailed local data</span></div>
+</div>"""
+
+
+# ── STATE PAGE BUILDER ────────────────────────────────────────────────────────
+
+def build_state_page(abbr, state_zhvi, pmms, rates, spread):
+    """Generate a standalone state page HTML for states/{abbr}.html"""
+    name      = state_zhvi.get("name", abbr)
+    zhvi      = state_zhvi.get("zhvi")
+    zhvi_yoy  = state_zhvi.get("zhvi_yoy")
+    zhvi_mom  = state_zhvi.get("zhvi_mom")
+    period    = state_zhvi.get("period", "")
+    r30       = pmms.get("rate_30y") or 0
+    pdate     = pmms.get("date", "N/A")
+    yago      = pmms.get("yago_30y") or 0
+    yoy_bps   = round((r30 - yago) * 100) if yago else 0
+    spread_bps = spread.get("spread_bps", "N/A")
+
+    zhvi_fmt     = f"${zhvi:,}" if zhvi else "N/A"
+    yoy_str      = f"{zhvi_yoy:+.1f}% YoY" if zhvi_yoy is not None else ""
+    mom_str      = f"{zhvi_mom:+.2f}% MoM" if zhvi_mom is not None else ""
+    yoy_col      = "#3EB4A5" if (zhvi_yoy or 0) >= 0 else "#D64045"
+    period_label = ""
+    try:
+        period_label = datetime.datetime.strptime(period + "-01", "%Y-%m-%d").strftime("%B %Y")
+    except:
+        period_label = period
+
+    # Try to format period nicely
+    try:
+        period_label = datetime.datetime.strptime(period, "%Y-%m").strftime("%B %Y")
+    except:
+        pass
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{name} Housing Market · Newzip Market Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{{
+    --nz-blue:#4C6DE1;--nz-blue-light:#EEF1FC;
+    --nz-teal:#005E53;--nz-teal-light:#E6F2F0;
+    --nz-teal-bright:#3EB4A5;--nz-teal-bright-light:#E8F7F5;
+    --nz-yellow:#FAC515;--nz-yellow-light:#FEF7DC;
+    --ink:#1a1a2e;--paper:#F8F9FC;--paper2:#EFF1F8;
+    --border:#E2E5F0;--muted:#6B7280;--card:#FFFFFF;
+    --nz-red:#D64045;--nz-red-light:#FDF0F0;--gold:#D4943A;
+  }}
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:clamp(13px,1.5vw,15px)}}
+  a{{color:inherit;text-decoration:none}}
+  .topbar{{background:white;border-bottom:2px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(76,109,225,.08)}}
+  .topbar-inner{{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:1rem;padding:.75rem 0}}
+  .logo-wrap{{display:flex;align-items:center;gap:.75rem;text-decoration:none}}
+  .logo-wrap img{{height:22px}}
+  .header-title{{font-size:clamp(.6rem,.8vw,.72rem);font-weight:600;color:var(--nz-blue);letter-spacing:.05em;text-transform:uppercase}}
+  .back-link{{font-family:'DM Mono',monospace;font-size:clamp(.55rem,.7vw,.62rem);color:var(--muted);padding:.3rem .7rem;border:1px solid var(--border);border-radius:5px;margin-left:auto;transition:color .15s,border-color .15s}}
+  .back-link:hover{{color:var(--nz-blue);border-color:var(--nz-blue)}}
+  main{{max-width:1280px;margin:0 auto;padding:clamp(1rem,3vw,1.75rem) clamp(.75rem,2vw,1.5rem)}}
+  .state-hero{{background:linear-gradient(135deg,#4C6DE1 0%,#005E53 100%);border-radius:14px;padding:clamp(1.25rem,3vw,2rem);margin-bottom:2rem;color:white}}
+  .state-name{{font-size:clamp(1.4rem,4vw,2.5rem);font-weight:700;margin-bottom:.25rem}}
+  .state-sub{{font-family:'DM Mono',monospace;font-size:clamp(.55rem,.8vw,.65rem);opacity:.7;margin-bottom:1.25rem}}
+  .hero-stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem}}
+  .hero-stat-val{{font-size:clamp(1.3rem,3vw,2rem);font-weight:700;line-height:1}}
+  .hero-stat-lbl{{font-family:'DM Mono',monospace;font-size:clamp(.48rem,.6vw,.55rem);opacity:.6;text-transform:uppercase;letter-spacing:.08em;margin-top:.2rem}}
+  .hero-stat-chg{{font-family:'DM Mono',monospace;font-size:clamp(.55rem,.7vw,.62rem);margin-top:.3rem;opacity:.85}}
+  .section-hd{{display:flex;align-items:center;gap:1rem;margin:2rem 0 1.25rem;padding:.9rem 1.25rem;border-radius:8px;border-left:4px solid var(--nz-blue);background:var(--nz-blue-light)}}
+  .section-hd-label{{font-size:clamp(.72rem,1vw,.82rem);font-weight:700;color:var(--nz-blue)}}
+  .panel{{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem}}
+  .ph{{padding:.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}}
+  .ph h3{{font-size:clamp(.78rem,1.1vw,.9rem);font-weight:600}}
+  .badge{{font-family:'DM Mono',monospace;font-size:.52rem;padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}}
+  .badge-blue{{background:var(--nz-blue-light);color:var(--nz-blue)}}
+  .badge-teal{{background:var(--nz-teal-light);color:var(--nz-teal)}}
+  .sb{{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted)}}
+  .sd{{width:5px;height:5px;border-radius:50%;background:var(--nz-teal);flex-shrink:0}}
+  .stat-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;padding:1.25rem}}
+  .stat-item{{background:var(--paper);border-radius:8px;padding:1rem 1.25rem;border-left:3px solid var(--nz-blue)}}
+  .si-label{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}}
+  .si-val{{font-size:clamp(1.1rem,2vw,1.5rem);font-weight:700;color:var(--ink)}}
+  .si-chg{{font-family:'DM Mono',monospace;font-size:.55rem;margin-top:.2rem}}
+  .rate-strip{{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border)}}
+  .rate-cell{{background:white;padding:.85rem 1rem}}
+  .rc-lbl{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}}
+  .rc-val{{font-size:clamp(1rem,1.8vw,1.3rem);font-weight:700;color:var(--ink)}}
+  .rc-sub{{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}}
+  footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="logo-wrap" href="../index.html#top">
+      <img src="../index_files/logo.svg" alt="Newzip" onerror="this.style.display='none'">
+      <div class="header-title">Market Tracker</div>
+    </a>
+    <a class="back-link" href="../index.html">← National Overview</a>
+  </div>
+</div>
+
+<main>
+  <div class="state-hero">
+    <div class="state-name">{name}</div>
+    <div class="state-sub">Local Housing Market · Zillow ZHVI · {period_label}</div>
+    <div class="hero-stats">
+      <div>
+        <div class="hero-stat-val">{zhvi_fmt}</div>
+        <div class="hero-stat-lbl">Typical Home Value</div>
+        <div class="hero-stat-chg" style="color:{yoy_col};">{yoy_str} &nbsp;{mom_str}</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">{r30:.2f}%</div>
+        <div class="hero-stat-lbl">30Y Mortgage Rate</div>
+        <div class="hero-stat-chg">PMMS · {pdate}</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">{abs(yoy_bps)}bps</div>
+        <div class="hero-stat-lbl">YoY Rate Change</div>
+        <div class="hero-stat-chg">{'▼ Lower' if yoy_bps <= 0 else '▲ Higher'} than 1yr ago</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">{spread_bps}bps</div>
+        <div class="hero-stat-lbl">30Y/10Y Spread</div>
+        <div class="hero-stat-chg">Norm ~170bps</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-hd">
+    <span class="section-hd-label">🏘 {name} Home Values</span>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h3>Zillow Home Value Index (ZHVI)</h3><span class="badge badge-blue">Zillow</span></div>
+    <div class="stat-grid">
+      <div class="stat-item">
+        <div class="si-label">Typical Home Value</div>
+        <div class="si-val">{zhvi_fmt}</div>
+        <div class="si-chg" style="color:{yoy_col};">{yoy_str}</div>
+      </div>
+      <div class="stat-item">
+        <div class="si-label">Month-over-Month</div>
+        <div class="si-val">{mom_str or 'N/A'}</div>
+        <div class="si-chg" style="color:var(--muted);">{period_label}</div>
+      </div>
+      <div class="stat-item" style="border-left-color:var(--muted);background:var(--paper2);">
+        <div class="si-label">Data Period</div>
+        <div class="si-val" style="font-size:1rem;">{period_label}</div>
+        <div class="si-chg" style="color:var(--muted);">Updated monthly</div>
+      </div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>Zillow ZHVI · State-level · Smoothed, seasonally adjusted · Updated monthly</span></div>
+  </div>
+
+  <div class="section-hd" style="border-left-color:var(--nz-teal-bright);background:var(--nz-teal-bright-light);">
+    <span class="section-hd-label" style="color:var(--nz-teal-bright);">📊 National Mortgage Rates</span>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h3>Current Mortgage Rates</h3><span class="badge badge-teal">Freddie Mac PMMS</span></div>
+    <div class="rate-strip">
+      <div class="rate-cell">
+        <div class="rc-lbl">30Y Fixed</div>
+        <div class="rc-val">{r30:.2f}%</div>
+        <div class="rc-sub">PMMS · {pdate}</div>
+      </div>
+      <div class="rate-cell">
+        <div class="rc-lbl">15Y Fixed</div>
+        <div class="rc-val">{pmms.get('rate_15y', 0):.2f}%</div>
+        <div class="rc-sub">PMMS · {pdate}</div>
+      </div>
+      <div class="rate-cell">
+        <div class="rc-lbl">1yr Ago 30Y</div>
+        <div class="rc-val">{yago:.2f}%</div>
+        <div class="rc-sub">{"▼ Rates lower now" if yoy_bps <= 0 else "▲ Rates higher now"}</div>
+      </div>
+      <div class="rate-cell">
+        <div class="rc-lbl">30Y/10Y Spread</div>
+        <div class="rc-val">{spread_bps}bps</div>
+        <div class="rc-sub">{spread.get('signal','—')} · norm ~170bps</div>
+      </div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>Freddie Mac PMMS via FRED · National rates · State-specific rates may vary slightly</span></div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);border:1px solid var(--border);">
+    <div style="padding:1.5rem;text-align:center;">
+      <div style="font-size:clamp(.8rem,1.5vw,1rem);font-weight:600;color:var(--ink);margin-bottom:.5rem;">More local data coming soon</div>
+      <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.8vw,.65rem);color:var(--muted);max-width:500px;margin:0 auto;line-height:1.7;">
+        We're adding Redfin metro-level data, FRED state housing indicators, and permit activity for {name}.
+        <br>Check back soon — or <a href="../index.html" style="color:var(--nz-blue);text-decoration:underline;">return to the national overview</a>.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div>Newzip Market Tracker · {name} · {RUN_TS} · Not financial advice</div>
+  <a href="../index.html" style="color:var(--nz-blue);">← National Overview</a>
+</footer>
+</body>
+</html>"""
+
+
 # ── ENTRY POINT ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -1744,15 +2100,36 @@ if __name__ == "__main__":
     redfin_market = fetch_redfin_market()
     zillow_market = fetch_zillow_market()
 
+    # Extract state-level data from Zillow result
+    state_data = zillow_market.pop("state_data", {})
+
     html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread,
-                      redfin_market=redfin_market, zillow_market=zillow_market)
+                      redfin_market=redfin_market, zillow_market=zillow_market, state_data=state_data)
     html = html.replace("{LOGO_SRC}", LOGO_SRC)
 
     with open("index.html","w",encoding="utf-8") as f:
         f.write(html)
+    print(f"Done — index.html written ({len(html):,} bytes)")
+
+    # ── Write state pages ──────────────────────────────────────────────────────
+    if state_data:
+        import os as _os
+        _os.makedirs("states", exist_ok=True)
+        written = 0
+        for abbr, sd in state_data.items():
+            try:
+                state_html = build_state_page(abbr, sd, pmms, rates, spread)
+                state_html = state_html.replace("{LOGO_SRC}", LOGO_SRC)
+                with open(f"states/{abbr}.html","w",encoding="utf-8") as f:
+                    f.write(state_html)
+                written += 1
+            except Exception as e:
+                print(f"  WARN: failed to write states/{abbr}.html: {e}")
+        print(f"Done — {written} state pages written to states/")
+    else:
+        print("  No state data — state pages skipped")
 
     print(f"\n{'='*60}")
-    print(f"Done — index.html written ({len(html):,} bytes)")
     print(f"  OBMMI 30Y    : {rates[0]['rate'] if rates else 'N/A'}%")
     print(f"  PMMS 30Y     : {pmms.get('rate_30y')}%")
     print(f"  HPSI         : {hpsi['value'] if hpsi else 'N/A'}")
@@ -1761,4 +2138,6 @@ if __name__ == "__main__":
     print(f"  Pending Index: {pending.get('value')} ({pending.get('date')})")
     print(f"  Redfin market: DOM {redfin_market.get('median_dom')}d · supply {redfin_market.get('months_of_supply')}mo · inv {redfin_market.get('inventory')}")
     print(f"  Zillow ZHVI  : ${zillow_market.get('zhvi'):,} ({zillow_market.get('zhvi_yoy'):+}% YoY)")
+    print(f"  State pages  : {len(state_data)} states")
     print(f"{'='*60}\n")
+
