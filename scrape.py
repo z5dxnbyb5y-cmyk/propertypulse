@@ -2155,7 +2155,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread):
       <div class="stat-item">
         <div class="si-label">Typical Home Value</div>
         <div class="si-val">{zhvi_fmt}</div>
-        <div class="si-chg" style="color:{yoy_col};">{yoy_str}</div>
+        <div class="si-chg" style="color:var(--muted);">{yoy_str}</div>
       </div>
       <div class="stat-item">
         <div class="si-label">Month-over-Month</div>
