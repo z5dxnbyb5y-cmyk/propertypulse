@@ -1882,15 +1882,15 @@ def build_us_map_html(state_data):
         yoy  = sd.get("zhvi_yoy")
         fill = _color(yoy)
         name = sd.get("name", abbr)
-        tip_safe = f"{name}: ${zhvi:,} ({yoy:+.1f}% YoY)" if zhvi else abbr
-        tip_js   = tip_safe.replace("'", "\\'")
+        tip_safe = f"{name}: ${zhvi:,} · Home prices {yoy:+.1f}% YoY" if zhvi else abbr
+        tip_js   = tip_safe.replace("'", "\\'").replace('"', '&quot;')
         href   = f"states/{abbr}.html" if zhvi else "#"
         cursor = "pointer" if zhvi else "default"
         path_els.append(
             f'<a href="{href}"><path d="{d}" fill="{fill}" stroke="white" stroke-width="0.8" '
             f'style="cursor:{cursor};transition:filter .15s" '
-            f'onmouseover="this.style.filter=\'brightness(0.85)\';document.getElementById(\'tip\').textContent=\'{tip_js}\'" '
-            f'onmouseout="this.style.filter=\'none\';document.getElementById(\'tip\').textContent=\'Hover over a state to see data\'">' 
+            f'onmouseover="this.style.filter=\'brightness(0.85)\';showTip(\'{tip_js}\',\'{fill}\')" '
+            f'onmouseout="this.style.filter=\'none\';clearTip()">'
             f'<title>{tip_safe}</title></path></a>'
         )
 
@@ -1914,7 +1914,7 @@ def build_us_map_html(state_data):
   <div class="ph">
     <div>
       <h3>Explore by State</h3>
-      <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:#6B7280;margin-top:.2rem;">Click any state to view local market data · Zillow ZHVI YoY % change</div>
+      <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:#6B7280;margin-top:.2rem;">Click any state for local data · Colors show <strong style="color:#4C6DE1;">home price appreciation (YoY %)</strong> via Zillow ZHVI</div>
     </div>
     <span class="badge badge-blue">Zillow ZHVI</span>
   </div>
@@ -1925,11 +1925,23 @@ def build_us_map_html(state_data):
       {svg_legend}
     </svg>
   </div>
-  <div class="sb">
-    <div class="sd" style="background:#4C6DE1;"></div>
-    <span id="tip">Hover over a state to see data</span>
+  <div id="tip" style="min-height:2.75rem;padding:.6rem 1.25rem;background:var(--ink);display:flex;align-items:center;gap:.6rem;transition:background .2s;">
+    <div style="width:8px;height:8px;border-radius:50%;background:#4C6DE1;flex-shrink:0;opacity:.7;"></div>
+    <span style="font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500;color:rgba(255,255,255,.6);letter-spacing:.01em;">Hover over a state to see home price data</span>
   </div>
-</div>"""
+</div>
+<script>
+function showTip(text, color) {{
+  var t = document.getElementById('tip');
+  t.innerHTML = '<div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.3)"></div>'
+    + '<span style="font-family:DM Mono,monospace;font-size:.82rem;font-weight:600;color:white;letter-spacing:.01em;">'+text+'</span>';
+}}
+function clearTip() {{
+  var t = document.getElementById('tip');
+  t.innerHTML = '<div style="width:8px;height:8px;border-radius:50%;background:#4C6DE1;flex-shrink:0;opacity:.7;"></div>'
+    + '<span style="font-family:DM Mono,monospace;font-size:.72rem;font-weight:500;color:rgba(255,255,255,.6);letter-spacing:.01em;">Hover over a state to see home price data</span>';
+}}
+</script>"""
 
 
 # ── STATE PAGE BUILDER ────────────────────────────────────────────────────────
@@ -2197,3 +2209,4 @@ if __name__ == "__main__":
     print(f"  Zillow ZHVI  : ${zillow_market.get('zhvi'):,} ({zillow_market.get('zhvi_yoy'):+}% YoY)")
     print(f"  State pages  : {len(state_data)} states")
     print(f"{'='*60}\n")
+
