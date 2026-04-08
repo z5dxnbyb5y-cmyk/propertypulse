@@ -27,10 +27,10 @@ jobs:
           FANNIE_CLIENT_ID: ${{ secrets.FANNIE_CLIENT_ID }}
           FANNIE_CLIENT_SECRET: ${{ secrets.FANNIE_CLIENT_SECRET }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # fix: enable AI briefing
-      - name: Commit and push updated index.html
+      - name: Commit and push updated files
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index.html
+          git add index.html states/
           git diff --cached --quiet || git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M UTC')"
           git push
