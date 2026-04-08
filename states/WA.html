@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Washington Housing Market · Newzip Market Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --nz-blue:#4C6DE1;--nz-blue-light:#EEF1FC;
+    --nz-teal:#005E53;--nz-teal-light:#E6F2F0;
+    --nz-teal-bright:#3EB4A5;--nz-teal-bright-light:#E8F7F5;
+    --nz-yellow:#FAC515;--nz-yellow-light:#FEF7DC;
+    --ink:#1a1a2e;--paper:#F8F9FC;--paper2:#EFF1F8;
+    --border:#E2E5F0;--muted:#6B7280;--card:#FFFFFF;
+    --nz-red:#D64045;--nz-red-light:#FDF0F0;--gold:#D4943A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:clamp(13px,1.5vw,15px)}
+  a{color:inherit;text-decoration:none}
+  .topbar{background:white;border-bottom:2px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(76,109,225,.08)}
+  .topbar-inner{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:1rem;padding:.75rem 0}
+  .logo-wrap{display:flex;align-items:center;gap:.75rem;text-decoration:none}
+  .logo-wrap img{height:22px}
+  .header-title{font-size:clamp(.6rem,.8vw,.72rem);font-weight:600;color:var(--nz-blue);letter-spacing:.05em;text-transform:uppercase}
+  .back-link{font-family:'DM Mono',monospace;font-size:clamp(.55rem,.7vw,.62rem);color:var(--muted);padding:.3rem .7rem;border:1px solid var(--border);border-radius:5px;margin-left:auto;transition:color .15s,border-color .15s}
+  .back-link:hover{color:var(--nz-blue);border-color:var(--nz-blue)}
+  main{max-width:1280px;margin:0 auto;padding:clamp(1rem,3vw,1.75rem) clamp(.75rem,2vw,1.5rem)}
+  .state-hero{background:linear-gradient(135deg,#4C6DE1 0%,#005E53 100%);border-radius:14px;padding:clamp(1.25rem,3vw,2rem);margin-bottom:2rem;color:white}
+  .state-name{font-size:clamp(1.4rem,4vw,2.5rem);font-weight:700;margin-bottom:.25rem}
+  .state-sub{font-family:'DM Mono',monospace;font-size:clamp(.55rem,.8vw,.65rem);opacity:.7;margin-bottom:1.25rem}
+  .hero-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem}
+  .hero-stat-val{font-size:clamp(1.3rem,3vw,2rem);font-weight:700;line-height:1}
+  .hero-stat-lbl{font-family:'DM Mono',monospace;font-size:clamp(.48rem,.6vw,.55rem);opacity:.6;text-transform:uppercase;letter-spacing:.08em;margin-top:.2rem}
+  .hero-stat-chg{font-family:'DM Mono',monospace;font-size:clamp(.55rem,.7vw,.62rem);margin-top:.3rem;opacity:.85}
+  .section-hd{display:flex;align-items:center;gap:1rem;margin:2rem 0 1.25rem;padding:.9rem 1.25rem;border-radius:8px;border-left:4px solid var(--nz-blue);background:var(--nz-blue-light)}
+  .section-hd-label{font-size:clamp(.72rem,1vw,.82rem);font-weight:700;color:var(--nz-blue)}
+  .panel{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
+  .ph{padding:.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .ph h3{font-size:clamp(.78rem,1.1vw,.9rem);font-weight:600}
+  .badge{font-family:'DM Mono',monospace;font-size:.52rem;padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}
+  .badge-blue{background:var(--nz-blue-light);color:var(--nz-blue)}
+  .badge-teal{background:var(--nz-teal-light);color:var(--nz-teal)}
+  .sb{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted)}
+  .sd{width:5px;height:5px;border-radius:50%;background:var(--nz-teal);flex-shrink:0}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;padding:1.25rem}
+  .stat-item{background:var(--paper);border-radius:8px;padding:1rem 1.25rem;border-left:3px solid var(--nz-blue)}
+  .si-label{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}
+  .si-val{font-size:clamp(1.1rem,2vw,1.5rem);font-weight:700;color:var(--ink)}
+  .si-chg{font-family:'DM Mono',monospace;font-size:.55rem;margin-top:.2rem}
+  .rate-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border)}
+  .rate-cell{background:white;padding:.85rem 1rem}
+  .rc-lbl{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+  .rc-val{font-size:clamp(1rem,1.8vw,1.3rem);font-weight:700;color:var(--ink)}
+  .rc-sub{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}
+  footer{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="logo-wrap" href="../index.html#top">
+      <img src="../index_files/logo.svg" alt="Newzip" onerror="this.style.display='none'">
+      <div class="header-title">Market Tracker</div>
+    </a>
+    <a class="back-link" href="../index.html">← National Overview</a>
+  </div>
+</div>
+
+<main>
+  <div class="state-hero">
+    <div class="state-name">Washington</div>
+    <div class="state-sub">Local Housing Market · Zillow ZHVI · February 2026</div>
+    <div class="hero-stats">
+      <div>
+        <div class="hero-stat-val">$592,562</div>
+        <div class="hero-stat-lbl">Typical Home Value</div>
+        <div class="hero-stat-chg" style="color:#D64045;">-0.6% YoY &nbsp;+0.05% MoM</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">6.46%</div>
+        <div class="hero-stat-lbl">30Y Mortgage Rate</div>
+        <div class="hero-stat-chg">PMMS · Apr 02, 2026</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">16bps</div>
+        <div class="hero-stat-lbl">YoY Rate Change</div>
+        <div class="hero-stat-chg">▼ Lower than 1yr ago</div>
+      </div>
+      <div>
+        <div class="hero-stat-val">213bps</div>
+        <div class="hero-stat-lbl">30Y/10Y Spread</div>
+        <div class="hero-stat-chg">Norm ~170bps</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-hd">
+    <span class="section-hd-label">🏘 Washington Home Values</span>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h3>Zillow Home Value Index (ZHVI)</h3><span class="badge badge-blue">Zillow</span></div>
+    <div class="stat-grid">
+      <div class="stat-item">
+        <div class="si-label">Typical Home Value</div>
+        <div class="si-val">$592,562</div>
+        <div class="si-chg" style="color:#D64045;">-0.6% YoY</div>
+      </div>
+      <div class="stat-item">
+        <div class="si-label">Month-over-Month</div>
+        <div class="si-val">+0.05% MoM</div>
+        <div class="si-chg" style="color:var(--muted);">February 2026</div>
+      </div>
+      <div class="stat-item" style="border-left-color:var(--muted);background:var(--paper2);">
+        <div class="si-label">Data Period</div>
+        <div class="si-val" style="font-size:1rem;">February 2026</div>
+        <div class="si-chg" style="color:var(--muted);">Updated monthly</div>
+      </div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>Zillow ZHVI · State-level · Smoothed, seasonally adjusted · Updated monthly</span></div>
+  </div>
+
+  <div class="section-hd" style="border-left-color:var(--nz-teal-bright);background:var(--nz-teal-bright-light);">
+    <span class="section-hd-label" style="color:var(--nz-teal-bright);">📊 National Mortgage Rates</span>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h3>Current Mortgage Rates</h3><span class="badge badge-teal">Freddie Mac PMMS</span></div>
+    <div class="rate-strip">
+      <div class="rate-cell">
+        <div class="rc-lbl">30Y Fixed</div>
+        <div class="rc-val">6.46%</div>
+        <div class="rc-sub">PMMS · Apr 02, 2026</div>
+      </div>
+      <div class="rate-cell">
+        <div class="rc-lbl">15Y Fixed</div>
+        <div class="rc-val">5.77%</div>
+        <div class="rc-sub">PMMS · Apr 02, 2026</div>
+      </div>
+      <div class="rate-cell">
+        <div class="rc-lbl">1yr Ago 30Y</div>
+        <div class="rc-val">6.62%</div>
+        <div class="rc-sub">▼ Rates lower now</div>
+      </div>
+      <div class="rate-cell">
+        <div class="rc-lbl">30Y/10Y Spread</div>
+        <div class="rc-val">213bps</div>
+        <div class="rc-sub">Normal · norm ~170bps</div>
+      </div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>Freddie Mac PMMS via FRED · National rates · State-specific rates may vary slightly</span></div>
+  </div>
+
+  <div class="panel" style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);border:1px solid var(--border);">
+    <div style="padding:1.5rem;text-align:center;">
+      <div style="font-size:clamp(.8rem,1.5vw,1rem);font-weight:600;color:var(--ink);margin-bottom:.5rem;">More local data coming soon</div>
+      <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.8vw,.65rem);color:var(--muted);max-width:500px;margin:0 auto;line-height:1.7;">
+        We're adding Redfin metro-level data, FRED state housing indicators, and permit activity for Washington.
+        <br>Check back soon — or <a href="../index.html" style="color:var(--nz-blue);text-decoration:underline;">return to the national overview</a>.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div>Newzip Market Tracker · Washington · Apr 08, 2026 08:41 PM UTC · Not financial advice</div>
+  <a href="../index.html" style="color:var(--nz-blue);">← National Overview</a>
+</footer>
+</body>
+</html>
