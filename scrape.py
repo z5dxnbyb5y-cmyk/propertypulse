@@ -1458,7 +1458,30 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);line-height:1.8;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}}
   .footer-logo img{{height:18px;opacity:.5}}
-</style>
+
+  /* ── MOTION ─────────────────────────────────────────────────────────── */
+  /* Fade + slide up on scroll */
+  .reveal{{opacity:0;transform:translateY(20px);transition:opacity .55s cubic-bezier(.22,1,.36,1),transform .55s cubic-bezier(.22,1,.36,1)}}
+  .reveal.visible{{opacity:1;transform:translateY(0)}}
+  /* Staggered children */
+  .reveal-stagger > *{{opacity:0;transform:translateY(16px);transition:opacity .5s cubic-bezier(.22,1,.36,1),transform .5s cubic-bezier(.22,1,.36,1)}}
+  .reveal-stagger.visible > *:nth-child(1){{opacity:1;transform:translateY(0);transition-delay:.05s}}
+  .reveal-stagger.visible > *:nth-child(2){{opacity:1;transform:translateY(0);transition-delay:.12s}}
+  .reveal-stagger.visible > *:nth-child(3){{opacity:1;transform:translateY(0);transition-delay:.19s}}
+  .reveal-stagger.visible > *:nth-child(4){{opacity:1;transform:translateY(0);transition-delay:.26s}}
+  .reveal-stagger.visible > *:nth-child(5){{opacity:1;transform:translateY(0);transition-delay:.33s}}
+  .reveal-stagger.visible > *:nth-child(6){{opacity:1;transform:translateY(0);transition-delay:.40s}}
+  /* Section header slide in from left */
+  .section-hd{{transition:opacity .5s ease,transform .5s cubic-bezier(.22,1,.36,1)}}
+  .section-hd.reveal{{transform:translateX(-16px) translateY(0)}}
+  .section-hd.reveal.visible{{transform:translateX(0) translateY(0)}}
+  /* Panel hover lift */
+  .panel,.tbl-wrap,.stat-tile,.rate-card{{transition:box-shadow .2s ease,transform .2s ease}}
+  .panel:hover,.tbl-wrap:hover{{box-shadow:0 6px 24px rgba(76,109,225,.1);transform:translateY(-2px)}}
+  .stat-tile:hover{{box-shadow:0 6px 20px rgba(76,109,225,.13);transform:translateY(-2px)}}
+  .rate-card:hover{{box-shadow:0 6px 20px rgba(76,109,225,.13);transform:translateY(-2px)}}
+  /* Count-up numbers */
+  .countup{{display:inline}}</style>
 </head>
 <body id="top">
 
@@ -1493,7 +1516,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 <main>
 
   <!-- ── FED NOTE ─────────────────────────────────────────────────────── -->
-  <div class="fed-note">
+  <div class="fed-note reveal">
     <div class="fed-icon">🏦</div>
     <div>
       <h4>Federal Reserve — Rate Held at 3.50–3.75% · Next Meeting April 28–29, 2026</h4>
@@ -1502,7 +1525,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   </div>
 
   <!-- ── 1-MINUTE BRIEFING ──────────────────────────────────────────────── -->
-  <div class="brief-card">
+  <div class="brief-card reveal">
     <div class="brief-head">
       <div class="brief-pulse"></div>
       <div class="brief-head-label">1-Minute Briefing</div>
@@ -1520,7 +1543,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
        SECTION 1 — REAL ESTATE MARKET TRENDS
        Redfin/Zillow pulse · Existing Sales · Housing Outlook · Econ · Risk
   ═══════════════════════════════════════════════════════════════════════ -->
-  <div class="section-hd section-hd-blue" id="real-estate">
+  <div class="section-hd section-hd-blue reveal" id="real-estate">
     <span class="section-hd-label">Real Estate Market Trends</span>
   </div>
 
@@ -1601,40 +1624,40 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
        SECTION 2 — MORTGAGE & MARKET INSIGHTS
        Key Indicators · OBMMI · PMMS · Fannie Forecast · Spread
   ═══════════════════════════════════════════════════════════════════════ -->
-  <div class="section-hd section-hd-teal" id="mortgage-insights">
+  <div class="section-hd section-hd-teal reveal" id="mortgage-insights">
     <span class="section-hd-label">Mortgage &amp; Market Insights</span>
   </div>
 
   <div class="slbl slbl-teal">Key Indicators · {TODAY_STR}</div>
-  <div class="stat-tiles">
+  <div class="stat-tiles reveal-stagger">
     <div class="stat-tile">
       <div class="st-label">PMMS 30Y FRM</div>
-      <div class="st-val">{r30:.2f}%</div>
+      <div class="st-val"><span data-value="{r30:.2f}" data-suffix="%" data-decimals="2">{r30:.2f}%</span></div>
       <div class="st-sub">Freddie Mac · {pdate}</div>
       <div class="st-chg neg">{dir30} from {p30:.2f}% prev week</div>
     </div>
     <div class="stat-tile">
       <div class="st-label">PMMS 15Y FRM</div>
-      <div class="st-val">{r15:.2f}%</div>
+      <div class="st-val"><span data-value="{r15:.2f}" data-suffix="%" data-decimals="2">{r15:.2f}%</span></div>
       <div class="st-sub">Freddie Mac · {pdate}</div>
       <div class="st-chg neg">{dir15} from {p15:.2f}% prev week</div>
     </div>
     <div class="stat-tile">
       <div class="st-label">YoY Change</div>
-      <div class="st-val">{abs(yoy):.0f}bps</div>
+      <div class="st-val"><span data-value="{abs(yoy):.0f}" data-suffix="bps" data-decimals="0">{abs(yoy):.0f}bps</span></div>
       <div class="st-sub">30Y was {yago:.2f}% a year ago</div>
       <div class="st-chg {yoy_cls}">{yoy_label}</div>
     </div>
     <div class="stat-tile">
       <div class="st-label">30Y/10Y Spread</div>
-      <div class="st-val">{spread_bps_str}</div>
+      <div class="st-val"><span data-value="{spread.get('spread_bps',0)}" data-suffix="bps" data-decimals="0">{spread_bps_str}</span></div>
       <div class="st-sub">30Y {spread_r30}% · 10Y {spread_t10}% · FRED</div>
       <div class="st-chg {spread_cls}">{spread_signal_label}</div>
     </div>
   </div>
 
   <div class="slbl slbl-teal" id="rates">OBMMI Daily Rate Locks · Optimal Blue via FRED API · {obmmi_date}</div>
-  <div class="rate-grid" id="rate-grid"></div>
+  <div class="rate-grid reveal-stagger" id="rate-grid"></div>
 
   <div class="slbl slbl-teal">Full OBMMI Rate Comparison · {obmmi_date}</div>
   <div class="tbl-wrap tbl-wrap-teal">
@@ -1652,22 +1675,22 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     <div class="pmms-strip">
       <div class="pmms-cell">
         <div class="pmms-lbl">30Y FRM · {pdate}</div>
-        <div class="pmms-val">{r30:.2f}%</div>
+        <div class="pmms-val"><span data-value="{r30:.2f}" data-suffix="%" data-decimals="2">{r30:.2f}%</span></div>
         <div class="pmms-sub">Weekly avg · 20% down · excellent credit</div>
       </div>
       <div class="pmms-cell">
         <div class="pmms-lbl">15Y FRM · {pdate}</div>
-        <div class="pmms-val">{r15:.2f}%</div>
+        <div class="pmms-val"><span data-value="{r15:.2f}" data-suffix="%" data-decimals="2">{r15:.2f}%</span></div>
         <div class="pmms-sub">Weekly survey avg</div>
       </div>
       <div class="pmms-cell">
         <div class="pmms-lbl">30Y Prev Week</div>
-        <div class="pmms-val">{p30:.2f}%</div>
+        <div class="pmms-val"><span data-value="{p30:.2f}" data-suffix="%" data-decimals="2">{p30:.2f}%</span></div>
         <div class="pmms-sub">Prior PMMS reading</div>
       </div>
       <div class="pmms-cell">
         <div class="pmms-lbl">30Y One Year Ago</div>
-        <div class="pmms-val">{yago:.2f}%</div>
+        <div class="pmms-val"><span data-value="{yago:.2f}" data-suffix="%" data-decimals="2">{yago:.2f}%</span></div>
         <div class="pmms-sub">Same week prior year</div>
       </div>
       <div class="pmms-cell">
@@ -1725,7 +1748,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <!-- ══════════════════════════════════════════════════════════════════════
        SECTION 3 — INDUSTRY NEWS
   ═══════════════════════════════════════════════════════════════════════ -->
-  <div class="section-hd section-hd-yellow" id="industry-news">
+  <div class="section-hd section-hd-yellow reveal" id="industry-news">
     <span class="section-hd-label">Industry News</span>
   </div>
 
@@ -1798,6 +1821,41 @@ function renderRow(r) {{
 }}
 document.getElementById('rate-grid').innerHTML = RATES.map(renderCard).join('');
 document.getElementById('rate-tbody').innerHTML = RATES.map(renderRow).join('');
+
+// ── SCROLL REVEAL ──────────────────────────────────────────────────────
+(function() {{
+  var els = document.querySelectorAll('.reveal, .reveal-stagger');
+  if (!els.length) return;
+  var io = new IntersectionObserver(function(entries) {{
+    entries.forEach(function(e) {{
+      if (e.isIntersecting) {{ e.target.classList.add('visible'); io.unobserve(e.target); }}
+    }});
+  }}, {{ threshold: 0.08, rootMargin: '0px 0px -40px 0px' }});
+  els.forEach(function(el) {{ io.observe(el); }});
+}})();
+
+// ── COUNT-UP ───────────────────────────────────────────────────────────
+function runCountUp(el) {{
+  var target = parseFloat(el.getAttribute('data-value'));
+  var suffix = el.getAttribute('data-suffix') || '';
+  var prefix = el.getAttribute('data-prefix') || '';
+  var decimals = parseInt(el.getAttribute('data-decimals') || '0');
+  var duration = 950;
+  var start = performance.now();
+  (function step(now) {{
+    var p = Math.min((now - start) / duration, 1);
+    var ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = prefix + (target * ease).toFixed(decimals) + suffix;
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = prefix + target.toFixed(decimals) + suffix;
+  }})(start);
+}}
+var cuIO = new IntersectionObserver(function(entries) {{
+  entries.forEach(function(e) {{
+    if (e.isIntersecting) {{ runCountUp(e.target); cuIO.unobserve(e.target); }}
+  }});
+}}, {{ threshold: 0.5 }});
+document.querySelectorAll('[data-value]').forEach(function(el) {{ cuIO.observe(el); }});
 
 </script>
 </body>
@@ -2223,4 +2281,3 @@ if __name__ == "__main__":
     print(f"  Zillow ZHVI  : ${zillow_market.get('zhvi'):,} ({zillow_market.get('zhvi_yoy'):+}% YoY)")
     print(f"  State pages  : {len(state_data)} states")
     print(f"{'='*60}\n")
-
