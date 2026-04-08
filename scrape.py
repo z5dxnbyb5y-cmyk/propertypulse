@@ -1190,6 +1190,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     --nz-teal:#005E53;
     --nz-teal-light:#E6F2F0;
     --nz-teal-mid:#3D8C84;
+    --nz-teal-bright:#3EB4A5;
+    --nz-teal-bright-light:#E8F7F5;
+    --nz-yellow:#FAC515;
+    --nz-yellow-light:#FEF7DC;
     --ink:#1a1a2e;
     --paper:#F8F9FC;
     --paper2:#EFF1F8;
@@ -1214,7 +1218,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .nav-inner::-webkit-scrollbar{{display:none}}
   .nav-link{{font-family:'DM Mono',monospace;font-size:.6rem;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:0 .9rem;white-space:nowrap;display:flex;align-items:center;border-bottom:3px solid transparent;border-top:3px solid transparent;transition:color .15s,border-color .15s}}
   .nav-link:hover{{color:var(--nz-blue);border-bottom-color:var(--nz-blue)}}
-  .nav-link:nth-child(1):hover,.nav-link:nth-child(2):hover{{border-bottom-color:var(--nz-teal);color:var(--nz-teal)}}
+  .nav-re:hover,.nav-pulse:hover,.nav-sales:hover{{color:var(--nz-blue)!important;border-bottom-color:var(--nz-blue)!important}}
+  .nav-mort:hover,.nav-obmmi:hover,.nav-pmms:hover,.nav-spread:hover,.nav-forecast:hover{{color:var(--nz-teal-bright)!important;border-bottom-color:var(--nz-teal-bright)!important}}
+  .nav-news:hover{{color:#9A7800!important;border-bottom-color:var(--nz-yellow)!important}}
   .topbar-meta{{display:flex;align-items:center;padding:.75rem 0 .75rem 1.5rem;border-left:1px solid var(--border)}}
   .hmeta{{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);text-align:right;line-height:1.7}}
 
@@ -1229,11 +1235,19 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   /* LAYOUT */
   main{{max-width:1280px;margin:0 auto;padding:1.75rem 1.5rem}}
-  .section-hd{{display:flex;align-items:center;gap:1rem;margin:2.5rem 0 1.25rem;padding-bottom:.65rem;border-bottom:2px solid var(--border)}}
-  .section-hd-label{{font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;color:var(--ink);letter-spacing:.01em}}
-  .section-hd::before{{content:'';display:block;width:4px;height:1.1rem;background:linear-gradient(180deg,#4C6DE1,#005E53);border-radius:2px;flex-shrink:0}}
+  .section-hd{{display:flex;align-items:center;gap:1rem;margin:2.5rem 0 1.25rem;padding:.9rem 1.25rem;border-radius:8px;border-left:4px solid var(--nz-blue);background:var(--nz-blue-light)}}
+  .section-hd-label{{font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;color:var(--nz-blue);letter-spacing:.01em}}
+  .section-hd-blue{{border-left-color:var(--nz-blue);background:var(--nz-blue-light)}}
+  .section-hd-blue .section-hd-label{{color:var(--nz-blue)}}
+  .section-hd-teal{{border-left-color:var(--nz-teal-bright);background:var(--nz-teal-bright-light)}}
+  .section-hd-teal .section-hd-label{{color:var(--nz-teal-bright)}}
+  .section-hd-yellow{{border-left-color:var(--nz-yellow);background:var(--nz-yellow-light)}}
+  .section-hd-yellow .section-hd-label{{color:#9A7800}}
   .slbl{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem}}
   .slbl::after{{content:'';flex:1;height:1px;background:var(--border)}}
+  .slbl-blue{{color:var(--nz-blue)}}.slbl-blue::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--nz-blue);flex-shrink:0}}
+  .slbl-teal{{color:var(--nz-teal-bright)}}.slbl-teal::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--nz-teal-bright);flex-shrink:0}}
+  .slbl-yellow{{color:#9A7800}}.slbl-yellow::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--nz-yellow);flex-shrink:0}}
   .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem}}
   .three-col{{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem;margin-bottom:2rem}}
   @media(max-width:860px){{.two-col,.three-col{{grid-template-columns:1fr}}}}
@@ -1252,7 +1266,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .brief-pulse{{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.85);flex-shrink:0;animation:pulse 2s ease-in-out infinite}}
   @keyframes pulse{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.3;transform:scale(.8)}}}}
   .brief-body{{padding:.5rem 0 1rem}}
-  .brief-row{{display:grid;grid-template-columns:150px 1fr;gap:1.75rem;padding:1.1rem 2rem;border-bottom:1px solid rgba(255,255,255,.08);align-items:baseline}}
+  .brief-row{{display:grid;grid-template-columns:200px 1fr;gap:1.75rem;padding:1.1rem 2rem;border-bottom:1px solid rgba(255,255,255,.08);align-items:baseline}}
   .brief-row-last{{border-bottom:none}}
   .brief-lbl{{font-family:'Inter',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.01em;text-transform:uppercase;color:white;line-height:1.4}}
   .brief-val{{font-family:'Inter',sans-serif;font-size:.95rem;font-weight:400;line-height:1.65;color:rgba(255,255,255,.85)}}
@@ -1282,7 +1296,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .stat-tiles{{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}}
   @media(max-width:700px){{.stat-tiles{{grid-template-columns:repeat(2,1fr)}}}}
   .stat-tile{{background:white;border:1px solid var(--border);border-radius:8px;padding:1.1rem 1.25rem;position:relative;overflow:hidden}}
-  .stat-tile::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--nz-blue)}}
+  .stat-tile::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--nz-teal-bright)}}
   .st-label{{font-family:'DM Mono',monospace;font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem}}
   .st-val{{font-size:1.9rem;font-weight:700;line-height:1;margin-bottom:.2rem;color:var(--ink)}}
   .st-sub{{font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted)}}
@@ -1381,15 +1395,15 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       <div class="header-title">Market Tracker</div>
     </div>
     <nav class="nav-inner">
-      <a class="nav-link" href="#real-estate">RE Market</a>
-      <a class="nav-link" href="#housing-pulse">Housing Pulse</a>
-      <a class="nav-link" href="#home-sales">Home Sales</a>
-      <a class="nav-link" href="#mortgage-insights">Mortgage</a>
-      <a class="nav-link" href="#rates">OBMMI</a>
-      <a class="nav-link" href="#pmms">PMMS</a>
-      <a class="nav-link" href="#spread">Spread</a>
-      <a class="nav-link" href="#forecast">Forecast</a>
-      <a class="nav-link" href="#industry-news">News</a>
+      <a class="nav-link nav-re" href="#real-estate">RE Market</a>
+      <a class="nav-link nav-pulse" href="#housing-pulse">Housing Pulse</a>
+      <a class="nav-link nav-sales" href="#home-sales">Home Sales</a>
+      <a class="nav-link nav-mort" href="#mortgage-insights">Mortgage</a>
+      <a class="nav-link nav-obmmi" href="#rates">OBMMI</a>
+      <a class="nav-link nav-pmms" href="#pmms">PMMS</a>
+      <a class="nav-link nav-spread" href="#spread">Spread</a>
+      <a class="nav-link nav-forecast" href="#forecast">Forecast</a>
+      <a class="nav-link nav-news" href="#industry-news">News</a>
     </nav>
     <div class="topbar-meta">
       <div class="hmeta">
@@ -1427,11 +1441,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
        SECTION 1 — REAL ESTATE MARKET TRENDS
        Redfin/Zillow pulse · Existing Sales · Housing Outlook · Econ · Risk
   ═══════════════════════════════════════════════════════════════════════ -->
-  <div class="section-hd" id="real-estate">
+  <div class="section-hd section-hd-blue" id="real-estate">
     <span class="section-hd-label">Real Estate Market Trends</span>
   </div>
 
-  <div class="slbl" id="housing-pulse">Housing Market Pulse · Redfin &amp; Zillow Data</div>
+  <div class="slbl slbl-blue" id="housing-pulse">Housing Market Pulse · Redfin &amp; Zillow Data</div>
   <div class="panel" style="margin-bottom:2rem;overflow:hidden;padding:0;">
     <div class="ph"><h3>National Housing Market Conditions</h3><span class="badge badge-teal">Redfin · Zillow</span></div>
     {pulse_html}
@@ -1439,7 +1453,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   <div class="two-col">
     <div>
-      <div class="slbl" id="home-sales">Existing Home Sales · NAR via FRED</div>
+      <div class="slbl slbl-blue" id="home-sales">Existing Home Sales · NAR via FRED</div>
       <div class="panel">
         <div class="ph"><h3>Existing Home Sales</h3><span class="badge badge-teal">FRED · NAR</span></div>
         {pending_html_str}
@@ -1447,7 +1461,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       </div>
     </div>
     <div>
-      <div class="slbl" id="outlook">Fannie Mae ESR · Housing &amp; Economic Outlook · {fannie_date}</div>
+      <div class="slbl slbl-blue" id="outlook">Fannie Mae ESR · Housing &amp; Economic Outlook · {fannie_date}</div>
       <div class="panel" style="height:100%;box-sizing:border-box;">
         <div class="ph"><h3>Housing Market Outlook</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
         <div style="padding:1rem 1.25rem;">
@@ -1491,7 +1505,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
-  <div class="slbl">Market Risk Factors · Fannie Mae ESR · {fannie_date}</div>
+  <div class="slbl slbl-blue">Market Risk Factors · Fannie Mae ESR · {fannie_date}</div>
   <div class="panel" style="margin-bottom:2rem;">
     <div class="ph"><h3>Market Risk Factors</h3><span class="badge badge-gold">Fannie Mae ESR</span></div>
     <div style="padding:1rem 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem 2rem;">
@@ -1508,11 +1522,11 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
        SECTION 2 — MORTGAGE & MARKET INSIGHTS
        Key Indicators · OBMMI · PMMS · Fannie Forecast · Spread
   ═══════════════════════════════════════════════════════════════════════ -->
-  <div class="section-hd" id="mortgage-insights">
+  <div class="section-hd section-hd-teal" id="mortgage-insights">
     <span class="section-hd-label">Mortgage &amp; Market Insights</span>
   </div>
 
-  <div class="slbl">Key Indicators · {TODAY_STR}</div>
+  <div class="slbl slbl-teal">Key Indicators · {TODAY_STR}</div>
   <div class="stat-tiles">
     <div class="stat-tile">
       <div class="st-label">PMMS 30Y FRM</div>
@@ -1540,10 +1554,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     </div>
   </div>
 
-  <div class="slbl" id="rates">OBMMI Daily Rate Locks · Optimal Blue via FRED API · {obmmi_date}</div>
+  <div class="slbl slbl-teal" id="rates">OBMMI Daily Rate Locks · Optimal Blue via FRED API · {obmmi_date}</div>
   <div class="rate-grid" id="rate-grid"></div>
 
-  <div class="slbl">Full OBMMI Rate Comparison · {obmmi_date}</div>
+  <div class="slbl slbl-teal">Full OBMMI Rate Comparison · {obmmi_date}</div>
   <div class="tbl-wrap">
     <div class="ph"><h3>Optimal Blue Mortgage Market Indices (OBMMI)</h3><span class="badge badge-blue">FRED API · OBMMI</span></div>
     <table>
@@ -1553,7 +1567,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     <div class="sb"><div class="sd"></div><span>Optimal Blue OBMMI via FRED API · Actual locked rates from ~35% of US mortgage transactions · Updated nightly</span></div>
   </div>
 
-  <div class="slbl" id="pmms">Freddie Mac PMMS · Via FRED API</div>
+  <div class="slbl slbl-teal" id="pmms">Freddie Mac PMMS · Via FRED API</div>
   <div class="panel" style="margin-bottom:2rem;">
     <div class="ph"><h3>Primary Mortgage Market Survey — Weekly Rates</h3><span class="badge badge-teal">Freddie Mac · FRED</span></div>
     <div class="pmms-strip">
@@ -1588,7 +1602,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   <div class="two-col">
     <div>
-      <div class="slbl" id="forecast">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
+      <div class="slbl slbl-teal" id="forecast">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
       <div class="tbl-wrap" style="margin-bottom:0;">
         <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">Fannie Mae API</span></div>
         <table class="ftable">
@@ -1599,7 +1613,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       </div>
     </div>
     <div>
-      <div class="slbl" id="spread">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
+      <div class="slbl slbl-teal" id="spread">30-Year Mortgage vs 10-Year Treasury Spread · Via FRED</div>
       <div class="panel" style="margin-bottom:0;">
         <div class="ph"><h3>30Y Mortgage / 10Y Treasury Spread</h3><span class="badge badge-blue">FRED API</span></div>
         <div class="pmms-strip" style="flex-wrap:wrap;">
@@ -1632,13 +1646,13 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <!-- ══════════════════════════════════════════════════════════════════════
        SECTION 3 — INDUSTRY NEWS
   ═══════════════════════════════════════════════════════════════════════ -->
-  <div class="section-hd" id="industry-news">
+  <div class="section-hd section-hd-yellow" id="industry-news">
     <span class="section-hd-label">Industry News</span>
   </div>
 
   <div class="two-col">
     <div>
-      <div class="slbl">Inman Real Estate News</div>
+      <div class="slbl slbl-yellow">Inman Real Estate News</div>
       <div class="panel">
         <div class="ph"><h3>Inman Real Estate News</h3><span class="badge badge-blue">Inman</span></div>
         {inman_html}
@@ -1646,7 +1660,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       </div>
     </div>
     <div>
-      <div class="slbl" id="housing-news">Housing Market News · Mortgage News Daily</div>
+      <div class="slbl slbl-yellow" id="housing-news">Housing Market News · Mortgage News Daily</div>
       <div class="panel">
         <div class="ph"><h3>Housing Market News</h3><span class="badge badge-blue">Mortgage News Daily</span></div>
         {fortune_html}
