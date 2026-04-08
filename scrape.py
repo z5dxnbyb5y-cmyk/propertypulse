@@ -2032,9 +2032,10 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread):
     spread_bps = spread.get("spread_bps", "N/A")
 
     zhvi_fmt     = f"${zhvi:,}" if zhvi else "N/A"
-    yoy_str      = f"{zhvi_yoy:+.1f}% YoY" if zhvi_yoy is not None else ""
-    mom_str      = f"{zhvi_mom:+.2f}% MoM" if zhvi_mom is not None else ""
-    yoy_col      = "#3EB4A5" if (zhvi_yoy or 0) >= 0 else "#D64045"
+    yoy_arrow    = "▲" if (zhvi_yoy or 0) >= 0 else "▼"
+    mom_arrow    = "▲" if (zhvi_mom or 0) >= 0 else "▼"
+    yoy_str      = f"{yoy_arrow} {abs(zhvi_yoy):.1f}% YoY" if zhvi_yoy is not None else ""
+    mom_str      = f"{mom_arrow} {abs(zhvi_mom):.2f}% MoM" if zhvi_mom is not None else ""
     period_label = ""
     try:
         period_label = datetime.datetime.strptime(period + "-01", "%Y-%m-%d").strftime("%B %Y")
@@ -2124,7 +2125,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread):
       <div>
         <div class="hero-stat-val">{zhvi_fmt}</div>
         <div class="hero-stat-lbl">Typical Home Value</div>
-        <div class="hero-stat-chg" style="color:{yoy_col};">{yoy_str} &nbsp;{mom_str}</div>
+        <div class="hero-stat-chg" style="color:rgba(255,255,255,0.65);">{yoy_str} &nbsp;{mom_str}</div>
       </div>
       <div>
         <div class="hero-stat-val">{r30:.2f}%</div>
