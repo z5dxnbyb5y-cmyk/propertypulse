@@ -1257,20 +1257,26 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   a{{color:inherit;text-decoration:none}}
 
   /* HEADER + NAV — merged into one sticky bar */
-  .topbar{{background:white;border-bottom:2px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(76,109,225,.08)}}
+  .topbar{{background:white;border-bottom:2px solid var(--border);padding:0 1rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(76,109,225,.08)}}
   .topbar-inner{{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:auto 1fr auto;align-items:stretch;gap:0}}
-  .logo-wrap{{display:flex;align-items:center;padding:.75rem 1.5rem .75rem 0;border-right:1px solid var(--border);gap:.75rem}}
-  .logo-wrap img{{height:24px;display:block}}
-  .header-title{{font-size:.68rem;font-weight:600;color:var(--nz-blue);letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}}
-  .nav-inner{{display:flex;align-items:stretch;gap:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;padding:0 .5rem}}
+  .logo-wrap{{display:flex;align-items:center;padding:.65rem 1rem .65rem 0;border-right:1px solid var(--border);gap:.6rem;flex-shrink:0}}
+  .logo-wrap img{{height:20px;display:block}}
+  .header-title{{font-size:.62rem;font-weight:600;color:var(--nz-blue);letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}}
+  .nav-inner{{display:flex;align-items:stretch;gap:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;padding:0 .25rem}}
   .nav-inner::-webkit-scrollbar{{display:none}}
-  .nav-link{{font-family:'DM Mono',monospace;font-size:.6rem;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:0 .9rem;white-space:nowrap;display:flex;align-items:center;border-bottom:3px solid transparent;border-top:3px solid transparent;transition:color .15s,border-color .15s}}
+  .nav-link{{font-family:'DM Mono',monospace;font-size:.55rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 .6rem;white-space:nowrap;display:flex;align-items:center;border-bottom:3px solid transparent;border-top:3px solid transparent;transition:color .15s,border-color .15s}}
   .nav-link:hover{{color:var(--nz-blue);border-bottom-color:var(--nz-blue)}}
   .nav-re:hover,.nav-pulse:hover,.nav-sales:hover{{color:var(--nz-blue)!important;border-bottom-color:var(--nz-blue)!important}}
   .nav-mort:hover,.nav-obmmi:hover,.nav-pmms:hover,.nav-spread:hover,.nav-forecast:hover{{color:var(--nz-teal-bright)!important;border-bottom-color:var(--nz-teal-bright)!important}}
   .nav-news:hover{{color:#9A7800!important;border-bottom-color:var(--nz-yellow)!important}}
-  .topbar-meta{{display:flex;align-items:center;padding:.75rem 0 .75rem 1.5rem;border-left:1px solid var(--border)}}
-  .hmeta{{font-family:'DM Mono',monospace;font-size:.52rem;color:var(--muted);text-align:right;line-height:1.7}}
+  .topbar-meta{{display:flex;align-items:center;padding:.65rem 0 .65rem 1rem;border-left:1px solid var(--border);flex-shrink:0}}
+  .hmeta{{font-family:'DM Mono',monospace;font-size:.48rem;color:var(--muted);text-align:right;line-height:1.7}}
+  @media(max-width:600px){{
+    .topbar-meta{{display:none}}
+    .topbar-inner{{grid-template-columns:auto 1fr}}
+    .logo-wrap{{border-right:none;padding-right:.5rem}}
+    .nav-link{{padding:0 .45rem;font-size:.5rem}}
+  }}
 
   /* TOOLTIP */
   .tip-wrap{{position:relative;display:inline-flex;align-items:center}}
@@ -1301,10 +1307,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   @media(max-width:480px){{.two-col{{gap:1rem}}}}
 
   /* ALERT BANNER */
-  .fed-note{{background:var(--nz-blue);color:white;padding:1rem 1.5rem;margin-bottom:2rem;border-radius:8px;display:flex;gap:1.25rem;align-items:flex-start}}
-  .fed-icon{{font-size:1.5rem;flex-shrink:0;opacity:.85}}
-  .fed-note h4{{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:.3rem}}
-  .fed-note p{{font-size:.75rem;line-height:1.65;color:rgba(255,255,255,.9)}}.fed-note strong{{color:white}}
+  .fed-note{{background:var(--nz-blue);color:white;padding:1rem 1.25rem;margin-bottom:2rem;border-radius:8px;display:flex;gap:1rem;align-items:flex-start}}
+  .fed-icon{{font-size:1.25rem;flex-shrink:0;opacity:.85}}
+  .fed-note h4{{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:.3rem}}
+  .fed-note p{{font-size:.72rem;line-height:1.65;color:rgba(255,255,255,.9)}}.fed-note strong{{color:white}}
 
   /* 1-MIN BRIEFING */
   .brief-card{{background:linear-gradient(135deg,#4C6DE1 0%,#005E53 100%);border-radius:14px;margin-bottom:2rem;overflow:hidden;box-shadow:0 6px 32px rgba(76,109,225,.28);max-width:900px;margin-left:auto;margin-right:auto}}
@@ -1314,11 +1320,18 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .brief-pulse{{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.85);flex-shrink:0;animation:pulse 2s ease-in-out infinite}}
   @keyframes pulse{{0%,100%{{opacity:1;transform:scale(1)}}50%{{opacity:.3;transform:scale(.8)}}}}
   .brief-body{{padding:.5rem 0 1rem}}
-  .brief-row{{display:grid;grid-template-columns:200px 1fr;gap:1.75rem;padding:1.1rem 2rem;border-bottom:1px solid rgba(255,255,255,.08);align-items:baseline}}
+  .brief-row{{display:grid;grid-template-columns:180px 1fr;gap:1.25rem;padding:1rem 1.5rem;border-bottom:1px solid rgba(255,255,255,.08);align-items:baseline}}
   .brief-row-last{{border-bottom:none}}
-  .brief-lbl{{font-family:'Inter',sans-serif;font-size:.95rem;font-weight:700;letter-spacing:.01em;text-transform:uppercase;color:white;line-height:1.4}}
-  .brief-val{{font-family:'Inter',sans-serif;font-size:.95rem;font-weight:400;line-height:1.65;color:rgba(255,255,255,.85)}}
+  .brief-lbl{{font-family:'Inter',sans-serif;font-size:.85rem;font-weight:700;letter-spacing:.01em;text-transform:uppercase;color:white;line-height:1.4}}
+  .brief-val{{font-family:'Inter',sans-serif;font-size:.88rem;font-weight:400;line-height:1.65;color:rgba(255,255,255,.85)}}
   .brief-row:first-child .brief-val{{font-weight:400;color:rgba(255,255,255,.85)}}
+  @media(max-width:640px){{
+    .brief-row{{grid-template-columns:1fr;gap:.35rem;padding:.85rem 1.1rem}}
+    .brief-lbl{{font-size:.72rem}}
+    .brief-val{{font-size:.82rem}}
+    .brief-head{{padding:.85rem 1.1rem .65rem}}
+    .brief-card{{border-radius:10px}}
+  }}
 
   /* HOUSING PULSE */
   .hp-signal{{border-radius:8px;padding:.85rem 1.25rem;margin:.75rem 1.25rem;}}
@@ -1389,6 +1402,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .tbl-wrap-teal::before{{background:var(--nz-teal-bright)}}
   .tbl-wrap .ph{{background:var(--nz-blue-light)}}
   .tbl-wrap-teal .ph{{background:var(--nz-teal-bright-light)}}
+  .tbl-scroll{{overflow-x:auto;-webkit-overflow-scrolling:touch}}
   table{{width:100%;border-collapse:collapse;font-size:.78rem}}
   thead th{{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:.65rem 1.25rem;text-align:left;border-bottom:1px solid var(--border);background:var(--paper);white-space:nowrap}}
   tbody tr{{border-bottom:1px solid var(--border);transition:background .15s}}
@@ -1403,8 +1417,8 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .bar-fill{{height:100%;border-radius:2px}}
 
   /* PMMS STRIP */
-  .pmms-strip{{display:flex;gap:1px;background:var(--border)}}
-  .pmms-cell{{flex:1;background:white;padding:.85rem 1rem}}
+  .pmms-strip{{display:flex;gap:1px;background:var(--border);flex-wrap:wrap}}
+  .pmms-cell{{flex:1;min-width:120px;background:white;padding:.85rem 1rem}}
   .pmms-lbl{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}}
   .pmms-val{{font-size:clamp(1rem,2vw,1.3rem);font-weight:700;line-height:1;color:var(--ink)}}
   .pmms-sub{{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}}
@@ -1625,10 +1639,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <div class="slbl slbl-teal">Full OBMMI Rate Comparison · {obmmi_date}</div>
   <div class="tbl-wrap tbl-wrap-teal">
     <div class="ph"><h3>Optimal Blue Mortgage Market Indices (OBMMI)</h3><span class="badge badge-blue">FRED API · OBMMI</span></div>
-    <table>
+    <div class="tbl-scroll"><table>
       <thead><tr><th>Loan Type</th><th>Current Rate</th><th>Prior Period</th><th>Change (bps)</th><th>Trend</th></tr></thead>
       <tbody id="rate-tbody"></tbody>
-    </table>
+    </table></div>
     <div class="sb"><div class="sd"></div><span>Optimal Blue OBMMI via FRED API · Actual locked rates from ~35% of US mortgage transactions · Updated nightly</span></div>
   </div>
 
@@ -1670,10 +1684,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       <div class="slbl slbl-teal" id="forecast">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
       <div class="tbl-wrap tbl-wrap-teal" style="margin-bottom:0;">
         <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">Fannie Mae API</span></div>
-        <table class="ftable">
+        <div class="tbl-scroll"><table class="ftable">
           <thead><tr><th>Period</th><th>Forecast</th><th>Source</th><th>Signal</th></tr></thead>
           <tbody>{fannie_rows_str}</tbody>
-        </table>
+        </table></div>
         <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Est. values from Mar 2026 ESR when API unavailable · Auto-updated monthly</span></div>
       </div>
     </div>
@@ -2183,4 +2197,3 @@ if __name__ == "__main__":
     print(f"  Zillow ZHVI  : ${zillow_market.get('zhvi'):,} ({zillow_market.get('zhvi_yoy'):+}% YoY)")
     print(f"  State pages  : {len(state_data)} states")
     print(f"{'='*60}\n")
-
