@@ -1925,21 +1925,35 @@ def build_us_map_html(state_data):
       {svg_legend}
     </svg>
   </div>
-  <div id="tip" style="min-height:2.75rem;padding:.6rem 1.25rem;background:var(--ink);display:flex;align-items:center;gap:.6rem;transition:background .2s;">
-    <div style="width:8px;height:8px;border-radius:50%;background:#4C6DE1;flex-shrink:0;opacity:.7;"></div>
-    <span style="font-family:'DM Mono',monospace;font-size:.72rem;font-weight:500;color:rgba(255,255,255,.6);letter-spacing:.01em;">Hover over a state to see home price data</span>
+  <div id="tip" style="min-height:3rem;padding:.7rem 1.5rem;background:linear-gradient(135deg,#4C6DE1 0%,#3a5bc9 100%);display:flex;align-items:center;gap:.75rem;transition:all .2s;">
+    <div style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.5);flex-shrink:0;"></div>
+    <span id="tip-text" style="font-family:'DM Mono',monospace;font-size:.82rem;font-weight:500;color:rgba(255,255,255,.8);letter-spacing:.01em;transition:font-size .15s;">Hover over a state to see home price data</span>
   </div>
 </div>
 <script>
 function showTip(text, color) {{
-  var t = document.getElementById('tip');
-  t.innerHTML = '<div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.3)"></div>'
-    + '<span style="font-family:DM Mono,monospace;font-size:.82rem;font-weight:600;color:white;letter-spacing:.01em;">'+text+'</span>';
+  var dot = document.querySelector('#tip div');
+  var txt = document.getElementById('tip-text');
+  dot.style.background = 'white';
+  dot.style.width = '10px';
+  dot.style.height = '10px';
+  dot.style.boxShadow = '0 0 0 2px rgba(255,255,255,.35)';
+  txt.textContent = text;
+  txt.style.fontSize = '1rem';
+  txt.style.fontWeight = '700';
+  txt.style.color = 'white';
 }}
 function clearTip() {{
-  var t = document.getElementById('tip');
-  t.innerHTML = '<div style="width:8px;height:8px;border-radius:50%;background:#4C6DE1;flex-shrink:0;opacity:.7;"></div>'
-    + '<span style="font-family:DM Mono,monospace;font-size:.72rem;font-weight:500;color:rgba(255,255,255,.6);letter-spacing:.01em;">Hover over a state to see home price data</span>';
+  var dot = document.querySelector('#tip div');
+  var txt = document.getElementById('tip-text');
+  dot.style.background = 'rgba(255,255,255,.5)';
+  dot.style.width = '8px';
+  dot.style.height = '8px';
+  dot.style.boxShadow = 'none';
+  txt.textContent = 'Hover over a state to see home price data';
+  txt.style.fontSize = '.82rem';
+  txt.style.fontWeight = '500';
+  txt.style.color = 'rgba(255,255,255,.8)';
 }}
 </script>"""
 
