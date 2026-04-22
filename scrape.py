@@ -1033,7 +1033,7 @@ def build_pending_html(pending):
                 f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">'
                 f'<div style="font-family:\'DM Mono\',monospace;font-size:.46rem;color:{val_col};font-weight:600;white-space:nowrap;">{v:.2f}M</div>'
                 f'<div style="width:100%;height:{h_px}px;background:{bar_bg};border-radius:3px 3px 0 0;border:1px solid {bar_bdr};"></div>'
-                f'<div style="font-family:\'DM Mono\',monospace;font-size:.48rem;color:{lbl_col};font-weight:{"600" if is_last else "400"};">{mo}</div>'
+                f'<div style="font-family:\'DM Mono\',monospace;font-size:clamp(.58rem,.65vw,.68rem);color:{lbl_col};font-weight:{"600" if is_last else "400"};">{mo}</div>'
                 f'</div>'
             )
 
@@ -1456,12 +1456,12 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .nav-mort:hover,.nav-obmmi:hover,.nav-pmms:hover,.nav-spread:hover,.nav-forecast:hover{{color:var(--nz-teal-bright)!important;border-bottom-color:var(--nz-teal-bright)!important}}
   .nav-news:hover{{color:#9A7800!important;border-bottom-color:var(--nz-yellow)!important}}
   .topbar-meta{{display:flex;align-items:center;padding:.65rem 0 .65rem 1rem;border-left:1px solid var(--border);flex-shrink:0}}
-  .hmeta{{font-family:'DM Mono',monospace;font-size:.48rem;color:var(--muted);text-align:right;line-height:1.7}}
+  .hmeta{{font-family:'DM Mono',monospace;font-size:clamp(.58rem,.65vw,.68rem);color:var(--muted);text-align:right;line-height:1.7}}
   @media(max-width:600px){{
     .topbar-meta{{display:none}}
     .topbar-inner{{grid-template-columns:auto 1fr}}
     .logo-wrap{{border-right:none;padding-right:.5rem}}
-    .nav-link{{padding:0 .45rem;font-size:.5rem}}
+    .nav-link{{padding:0 .45rem;font-size:clamp(.6rem,.7vw,.7rem)}}
   }}
 
   /* TOOLTIP */
@@ -1574,12 +1574,12 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .panel-teal .ph{{background:var(--nz-teal-bright-light)}}
   .panel-yellow .ph{{background:var(--nz-yellow-light)}}
   .ph h3{{font-size:clamp(.8rem,1.1vw,.9rem);font-weight:600;color:var(--ink)}}
-  .badge{{font-family:'DM Mono',monospace;font-size:.52rem;padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}}
+  .badge{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.72rem);padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}}
   .badge-blue{{background:rgba(76,109,225,.15);color:var(--nz-blue)}}
   .badge-teal{{background:rgba(62,180,165,.15);color:var(--nz-teal)}}
   .badge-gold{{background:#FDF3E3;color:var(--gold)}}
   .badge-red{{background:var(--nz-red-light);color:var(--nz-red)}}
-  .sb{{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted)}}
+  .sb{{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);color:var(--muted)}}
   .sd{{width:5px;height:5px;border-radius:50%;background:var(--nz-teal);flex-shrink:0}}
 
   /* TABLES */
@@ -1607,7 +1607,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .pmms-cell{{flex:1;min-width:120px;background:white;padding:.85rem 1rem}}
   .pmms-lbl{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}}
   .pmms-val{{font-size:clamp(1rem,2vw,1.3rem);font-weight:700;line-height:1;color:var(--ink)}}
-  .pmms-sub{{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}}
+  .pmms-sub{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.7rem);color:var(--muted);margin-top:.15rem}}
 
   /* MBA */
   .mba-section{{padding:1rem 1.25rem}}
@@ -1640,9 +1640,9 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .econ-cell{{background:white;padding:.85rem 1.1rem}}
   .ec-label{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.25rem;letter-spacing:.06em}}
   .ec-val{{font-size:clamp(1.1rem,2vw,1.4rem);font-weight:700;color:var(--ink);line-height:1;margin-bottom:.15rem}}
-  .ec-sub{{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted)}}
+  .ec-sub{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.7rem);color:var(--muted)}}
 
-  footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);line-height:1.8;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}}
+  footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);color:var(--muted);border-top:1px solid var(--border);line-height:1.8;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}}
   .footer-logo img{{height:18px;opacity:.5}}
 
   /* ── MOTION ─────────────────────────────────────────────────────────── */
@@ -2268,15 +2268,15 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
 
     def _metro_badge(rank_mm):
         if rank_mm is None: return ""
-        if rank_mm <= -5:  return '<span style="background:#E6F2F0;color:#005E53;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▲ RISING</span>'
-        if rank_mm >= 5:   return '<span style="background:#FDF0F0;color:#D64045;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▼ COOLING</span>'
-        return '<span style="background:#F5F5F5;color:#6B7280;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">STABLE</span>'
+        if rank_mm <= -5:  return '<span style="background:#E6F2F0;color:#005E53;font-size:clamp(.58rem,.65vw,.68rem);font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▲ RISING</span>'
+        if rank_mm >= 5:   return '<span style="background:#FDF0F0;color:#D64045;font-size:clamp(.58rem,.65vw,.68rem);font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▼ COOLING</span>'
+        return '<span style="background:#F5F5F5;color:#6B7280;font-size:clamp(.58rem,.65vw,.68rem);font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">STABLE</span>'
 
     def _demand_bar(score):
         if score is None: return ""
         pct = min(max(round(score), 0), 100)
         color = "#3EB4A5" if pct >= 60 else ("#FAC515" if pct >= 40 else "#D64045")
-        return f'<div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:{pct}%;background:{color};height:4px;border-radius:3px;"></div></div><div style="font-family:\'DM Mono\',monospace;font-size:.45rem;color:var(--muted);margin-top:.15rem;">Demand score {pct}/100</div>'
+        return f'<div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:{pct}%;background:{color};height:4px;border-radius:3px;"></div></div><div style="font-family:\'DM Mono\',monospace;font-size:clamp(.55rem,.6vw,.65rem);color:var(--muted);margin-top:.15rem;">Demand score {pct}/100</div>'
 
     metros_html = ""
     if hot_metros:
@@ -2292,14 +2292,14 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
           <div style="font-size:clamp(.7rem,1.1vw,.8rem);font-weight:600;color:var(--ink);line-height:1.3;">{city}</div>
           {badge}
         </div>
-        <div style="font-family:'DM Mono',monospace;font-size:.48rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #{m['hotness_rank']}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:clamp(.58rem,.65vw,.68rem);text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #{m['hotness_rank']}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.4rem;">
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median Price</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median Price</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">{price_str}</div>
           </div>
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median DOM</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median DOM</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">{dom_str}</div>
           </div>
         </div>
@@ -2307,7 +2307,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
       </div>"""
         metros_html += '</div>'
     else:
-        metros_html = '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;color:var(--muted);padding:.5rem 0;">No metro hotness data available for this state.</div>'
+        metros_html = '<div style="font-family:\'DM Mono\',monospace;font-size:clamp(.65rem,.75vw,.78rem);color:var(--muted);padding:.5rem 0;">No metro hotness data available for this state.</div>'
 
     realtor_section_html = ""
     if rd:
@@ -2319,7 +2319,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
   <div class="panel">
     <div class="ph"><h3>Market Indicators</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
     <div style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;border-left:3px solid var(--nz-blue);">
-      <div style="font-family:'DM Mono',monospace;font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--nz-blue);font-weight:700;margin-bottom:.6rem;">🏦 LO Market Signal · {rd_period_label}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.7rem);text-transform:uppercase;letter-spacing:.08em;color:var(--nz-blue);font-weight:700;margin-bottom:.6rem;">🏦 LO Market Signal · {rd_period_label}</div>
       {lo_signal_html}
     </div>
     <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">
@@ -2359,7 +2359,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
 
   <div class="panel">
     <div class="ph"><h3>Hottest Markets in {name}</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
-    <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted);margin-bottom:.25rem;">Top metros by national hotness rank (supply + demand composite) · {rd_period_label}</div>
+    <div style="font-family:'DM Mono',monospace;font-size:clamp(.63rem,.73vw,.76rem);color:var(--muted);margin-bottom:.25rem;">Top metros by national hotness rank (supply + demand composite) · {rd_period_label}</div>
     {metros_html}
     <div class="sb" style="margin-top:1rem;"><div class="sd"></div><span>Realtor.com Hotness Index · Metro-level · Higher demand score = more buyer activity relative to supply</span></div>
   </div>"""
@@ -2377,7 +2377,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
     --nz-red:#D64045;--nz-red-light:#FDF0F0;--gold:#D4943A;
   }}
   *{{box-sizing:border-box;margin:0;padding:0}}
-  body{{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:clamp(13px,1.5vw,15px)}}
+  body{{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:clamp(14px,1.2vw,16px)}}
   a{{color:inherit;text-decoration:none}}
   .topbar{{background:white;border-bottom:2px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(76,109,225,.08)}}
   .topbar-inner{{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:1rem;padding:.75rem 0}}
@@ -2399,22 +2399,22 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
   .panel{{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem}}
   .ph{{padding:.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}}
   .ph h3{{font-size:clamp(.78rem,1.1vw,.9rem);font-weight:600}}
-  .badge{{font-family:'DM Mono',monospace;font-size:.52rem;padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}}
+  .badge{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.72rem);padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}}
   .badge-blue{{background:var(--nz-blue-light);color:var(--nz-blue)}}
   .badge-teal{{background:var(--nz-teal-light);color:var(--nz-teal)}}
-  .sb{{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted)}}
+  .sb{{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);color:var(--muted)}}
   .sd{{width:5px;height:5px;border-radius:50%;background:var(--nz-teal);flex-shrink:0}}
   .stat-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;padding:1.25rem}}
   .stat-item{{background:var(--paper);border-radius:8px;padding:1rem 1.25rem;border-left:3px solid var(--nz-blue)}}
-  .si-label{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}}
+  .si-label{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.72rem);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}}
   .si-val{{font-size:clamp(1.1rem,2vw,1.5rem);font-weight:700;color:var(--ink)}}
-  .si-chg{{font-family:'DM Mono',monospace;font-size:.55rem;margin-top:.2rem}}
+  .si-chg{{font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);margin-top:.2rem}}
   .rate-strip{{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border)}}
   .rate-cell{{background:white;padding:.85rem 1rem}}
-  .rc-lbl{{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}}
+  .rc-lbl{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.72rem);text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}}
   .rc-val{{font-size:clamp(1rem,1.8vw,1.3rem);font-weight:700;color:var(--ink)}}
-  .rc-sub{{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}}
-  footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}}
+  .rc-sub{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.7rem);color:var(--muted);margin-top:.15rem}}
+  footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}}
 </style>
 </head>
 <body>
