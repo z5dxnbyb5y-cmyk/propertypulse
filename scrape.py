@@ -2319,38 +2319,38 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
   <div class="panel">
     <div class="ph"><h3>Market Indicators</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
     <div style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;border-left:3px solid var(--nz-blue);">
-      <div style="font-family:'DM Mono',monospace;font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--nz-blue);font-weight:700;margin-bottom:.6rem;">🏦 LO Market Signal · {{rd_period_label}}</div>
-      {{lo_signal_html}}
+      <div style="font-family:'DM Mono',monospace;font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--nz-blue);font-weight:700;margin-bottom:.6rem;">🏦 LO Market Signal · {rd_period_label}</div>
+      {lo_signal_html}
     </div>
     <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">
       <div class="stat-item">
         <div class="si-label">Median Listing Price</div>
-        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_price_fmt}}</div>
-        <div class="si-chg" style="color:var(--muted);">{{rd_price_yy}} YoY</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{rd_price_fmt}</div>
+        <div class="si-chg" style="color:var(--muted);">{rd_price_yy} YoY</div>
       </div>
       <div class="stat-item">
         <div class="si-label">Median Days on Market</div>
-        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_dom_fmt}}</div>
-        <div class="si-chg" style="color:var(--muted);">{{rd_dom_yy}}</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{rd_dom_fmt}</div>
+        <div class="si-chg" style="color:var(--muted);">{rd_dom_yy}</div>
       </div>
       <div class="stat-item">
         <div class="si-label">Active Listings</div>
-        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_active_fmt}}</div>
-        <div class="si-chg" style="color:var(--muted);">{{rd_active_yy}} YoY</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{rd_active_fmt}</div>
+        <div class="si-chg" style="color:var(--muted);">{rd_active_yy} YoY</div>
       </div>
       <div class="stat-item">
         <div class="si-label">New Listings</div>
-        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_new_fmt}}</div>
-        <div class="si-chg" style="color:var(--muted);">{{rd_new_yy}} YoY</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{rd_new_fmt}</div>
+        <div class="si-chg" style="color:var(--muted);">{rd_new_yy} YoY</div>
       </div>
       <div class="stat-item">
         <div class="si-label">Price Reduced Share</div>
-        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_cut_fmt}}</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{rd_cut_fmt}</div>
         <div class="si-chg" style="color:var(--muted);">of active listings</div>
       </div>
       <div class="stat-item">
         <div class="si-label">Pending Ratio</div>
-        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_pending_fmt}}</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{rd_pending_fmt}</div>
         <div class="si-chg" style="color:var(--muted);">pending ÷ active</div>
       </div>
     </div>
@@ -2359,8 +2359,8 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
 
   <div class="panel">
     <div class="ph"><h3>Hottest Markets in {name}</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
-    <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted);margin-bottom:.25rem;">Top metros by national hotness rank (supply + demand composite) · {{rd_period_label}}</div>
-    {{metros_html}}
+    <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted);margin-bottom:.25rem;">Top metros by national hotness rank (supply + demand composite) · {rd_period_label}</div>
+    {metros_html}
     <div class="sb" style="margin-top:1rem;"><div class="sd"></div><span>Realtor.com Hotness Index · Metro-level · Higher demand score = more buyer activity relative to supply</span></div>
   </div>"""
 
