@@ -623,6 +623,192 @@ def fetch_zillow_market():
         return fallback
 
 
+def fetch_realtor_state():
+    """
+    Pull Realtor.com state-level inventory & market metrics.
+    Source: econdata.s3-us-west-2.amazonaws.com — updated monthly.
+    Returns dict keyed by state abbreviation with latest month's data.
+    """
+    print("Fetching Realtor.com state inventory metrics...")
+    url = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Core/RDC_Inventory_Core_Metrics_State.csv"
+    try:
+        raw = fetch(url, timeout=30)
+        if not raw:
+            print("  Realtor state: empty response")
+            return {}
+        reader = csv.DictReader(io.StringIO(raw))
+        rows = list(reader)
+        if not rows:
+            return {}
+        latest = max(r["month_date_yyyymm"] for r in rows if r.get("month_date_yyyymm"))
+        result = {}
+        for row in rows:
+            if row.get("month_date_yyyymm") != latest:
+                continue
+            abbr = row.get("state_id", "").strip()
+            if not abbr:
+                continue
+            def _f(k):
+                try: return float(row[k]) if row.get(k) not in (None, "", "null") else None
+                except: return None
+            result[abbr] = {
+                "period":               latest,
+                "median_listing_price": _f("median_listing_price"),
+                "listing_price_yy":     _f("median_listing_price_yy"),
+                "listing_price_mm":     _f("median_listing_price_mm"),
+                "median_dom":           _f("median_days_on_market"),
+                "dom_yy":               _f("median_days_on_market_yy"),
+                "active_listings":      _f("active_listing_count"),
+                "active_listings_yy":   _f("active_listing_count_yy"),
+                "new_listings":         _f("new_listing_count"),
+                "new_listings_yy":      _f("new_listing_count_yy"),
+                "price_reduced_share":  _f("price_reduced_share"),
+                "price_reduced_yy":     _f("price_reduced_share_yy"),
+                "pending_ratio":        _f("pending_ratio"),
+                "pending_ratio_yy":     _f("pending_ratio_yy"),
+            }
+        ym = f"{latest[:4]}-{latest[4:]}"
+        try: period_label = datetime.datetime.strptime(ym + "-01", "%Y-%m-%d").strftime("%B %Y")
+        except: period_label = latest
+        print(f"  Realtor.com state inventory: {len(result)} states as of {period_label}")
+        return result
+    except Exception as e:
+        print(f"  Realtor state: fetch failed ({e})")
+        return {}
+
+
+def fetch_realtor_hotness():
+    """
+    Pull Realtor.com metro hotness rankings (historical CSV).
+    Returns dict keyed by state abbreviation → top 3 metros by hotness_rank.
+    Multi-state CBSAs assigned to first state listed.
+    """
+    print("Fetching Realtor.com metro hotness rankings...")
+    url = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Hotness/RDC_Inventory_Hotness_Metrics_Metro_History.csv"
+    try:
+        raw = fetch(url, timeout=30)
+        if not raw:
+            print("  Realtor hotness: empty response")
+            return {}
+        reader = csv.DictReader(io.StringIO(raw))
+        rows = list(reader)
+        if not rows:
+            return {}
+        latest = max(r["month_date_yyyymm"] for r in rows if r.get("month_date_yyyymm"))
+        rows = [r for r in rows if r.get("month_date_yyyymm") == latest]
+
+        def _f(k, row):
+            try: return float(row[k]) if row.get(k) not in (None, "", "null") else None
+            except: return None
+
+        def _parse_state(cbsa_title):
+            try:
+                after_comma = cbsa_title.rsplit(",", 1)[-1].strip()
+                return after_comma.split("-")[0].strip()[:2]
+            except:
+                return None
+
+        state_metros = {}
+        for row in rows:
+            title = row.get("cbsa_title", "").strip()
+            state = _parse_state(title)
+            if not state or len(state) != 2:
+                continue
+            rank = _f("hotness_rank", row)
+            if rank is None:
+                continue
+            metro = {
+                "name":          title,
+                "hotness_rank":  int(rank),
+                "rank_mm":       _f("hotness_rank_mm", row),
+                "dom":           _f("median_days_on_market", row),
+                "dom_yy_day":    _f("median_dom_yy_day", row),
+                "demand_score":  _f("demand_score", row),
+                "supply_score":  _f("supply_score", row),
+                "listing_price": _f("median_listing_price", row),
+                "price_vs_us":   _f("median_listing_price_vs_us", row),
+                "views_vs_us":   _f("page_view_count_per_property_vs_us", row),
+            }
+            state_metros.setdefault(state, []).append(metro)
+
+        result = {}
+        for state, metros in state_metros.items():
+            result[state] = sorted(metros, key=lambda m: m["hotness_rank"])[:3]
+
+        print(f"  Realtor.com hotness: {len(result)} states with metro data as of {latest}")
+        return result
+    except Exception as e:
+        print(f"  Realtor hotness: fetch failed ({e})")
+        return {}
+
+
+def build_realtor_lo_signal(rd):
+    """
+    Generate plain-English LO-focused market signal from Realtor.com state data.
+    Rule-based — no API calls. Returns an HTML string (2-3 bullet paragraphs).
+    rd = one state's dict from fetch_realtor_state()
+    """
+    if not rd:
+        return ""
+    lines = []
+
+    # 1. Inventory & pricing signal
+    active_yy = rd.get("active_listings_yy")
+    price_yy  = rd.get("listing_price_yy")
+    price_cut = rd.get("price_reduced_share")
+    if active_yy is not None and price_yy is not None:
+        inv_dir   = "up" if active_yy > 0 else "down"
+        inv_pct   = abs(round(active_yy * 100, 1))
+        price_dir = "rising" if price_yy > 0.01 else ("softening" if price_yy < -0.01 else "flat")
+        price_pct = abs(round(price_yy * 100, 1))
+        cut_str   = f" with {round(price_cut*100,1)}% of listings carrying a price cut" if price_cut else ""
+        if price_dir == "softening":
+            appraisal_note = "Appraisal risk is lower, but watch for value gaps on pending deals."
+        elif price_dir == "rising":
+            appraisal_note = "Rising prices support valuations, but verify comps carefully in fast-moving segments."
+        else:
+            appraisal_note = "Pricing is stable — comps should be reliable."
+        lines.append(f"Inventory is <strong>{inv_dir} {inv_pct}% YoY</strong> and listing prices are <strong>{price_dir} {price_pct}% YoY</strong>{cut_str}. {appraisal_note}")
+
+    # 2. Pipeline velocity signal
+    dom     = rd.get("median_dom")
+    dom_yy  = rd.get("dom_yy")
+    pending = rd.get("pending_ratio")
+    if dom is not None:
+        dom_int = int(dom)
+        pace = "fast-moving market" if dom_int <= 30 else ("moderate-paced market" if dom_int <= 50 else "slower market")
+        dom_trend = ""
+        if dom_yy is not None:
+            dom_yy_days = int(dom_yy)
+            if abs(dom_yy_days) >= 3:
+                dom_trend = f" ({abs(dom_yy_days)}d {'faster' if dom_yy_days < 0 else 'slower'} than a year ago)"
+        pending_str = ""
+        if pending is not None:
+            pending_str = f" Pending ratio is <strong>{round(pending, 2)}</strong> — {'strong buyer demand, expect competitive purchase timelines' if pending > 0.5 else 'moderate demand, purchase timelines are manageable'}."
+        lines.append(f"Homes are selling in a median <strong>{dom_int} days</strong> — a <strong>{pace}</strong>{dom_trend}.{pending_str}")
+
+    # 3. New listings / supply growth signal
+    new_yy = rd.get("new_listings_yy")
+    if new_yy is not None:
+        new_pct = abs(round(new_yy * 100, 1))
+        new_dir = "increasing" if new_yy > 0.02 else ("declining" if new_yy < -0.02 else "roughly flat")
+        if new_dir == "increasing":
+            lo_note = "More sellers entering the market supports purchase loan volume."
+        elif new_dir == "declining":
+            lo_note = "Fewer new listings may constrain purchase pipeline — focus on pre-approvals to capture demand early."
+        else:
+            lo_note = "Seller activity is stable."
+        lines.append(f"New listings are <strong>{new_dir} {new_pct}% YoY</strong>. {lo_note}")
+
+    if not lines:
+        return ""
+    html = '<div style="display:flex;flex-direction:column;gap:.6rem;">'
+    for line in lines:
+        html += f'<div style="font-size:clamp(.7rem,1.1vw,.8rem);line-height:1.7;color:var(--ink);">• {line}</div>'
+    html += '</div>'
+    return html
+
+
 def fetch_pending():
     """
     Fetch NAR Existing Home Sales via FRED.
@@ -2018,7 +2204,7 @@ function clearTip() {{
 
 # ── STATE PAGE BUILDER ────────────────────────────────────────────────────────
 
-def build_state_page(abbr, state_zhvi, pmms, rates, spread):
+def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, realtor_hotness=None):
     """Generate a standalone state page HTML for states/{abbr}.html"""
     name      = state_zhvi.get("name", abbr)
     zhvi      = state_zhvi.get("zhvi")
@@ -2048,12 +2234,137 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread):
     except:
         pass
 
+    # ── Realtor.com data for this state ──────────────────────────────────────
+    rd         = (realtor_state or {}).get(abbr, {})
+    hot_metros = (realtor_hotness or {}).get(abbr, [])
+    lo_signal_html = build_realtor_lo_signal(rd)
+
+    def _pct(v, dec=1):
+        if v is None: return "—"
+        pct = round(v * 100, dec)
+        arrow = "▲" if pct > 0 else ("▼" if pct < 0 else "")
+        return f"{arrow} {abs(pct):.{dec}f}%"
+
+    def _dollar(v):
+        if v is None: return "—"
+        return f"${int(v):,}"
+
+    rd_period = rd.get("period", "")
+    try:
+        rd_period_label = datetime.datetime.strptime(rd_period[:4] + "-" + rd_period[4:] + "-01", "%Y-%m-%d").strftime("%B %Y")
+    except:
+        rd_period_label = rd_period or period_label
+
+    rd_price_fmt   = _dollar(rd.get("median_listing_price"))
+    rd_price_yy    = _pct(rd.get("listing_price_yy"))
+    rd_dom_fmt     = f"{int(rd['median_dom'])}d" if rd.get("median_dom") is not None else "—"
+    rd_dom_yy      = f"{int(rd['dom_yy'])}d YoY" if rd.get("dom_yy") is not None else ""
+    rd_active_fmt  = f"{int(rd['active_listings']):,}" if rd.get("active_listings") is not None else "—"
+    rd_active_yy   = _pct(rd.get("active_listings_yy"))
+    rd_new_fmt     = f"{int(rd['new_listings']):,}" if rd.get("new_listings") is not None else "—"
+    rd_new_yy      = _pct(rd.get("new_listings_yy"))
+    rd_cut_fmt     = f"{round(rd['price_reduced_share']*100,1)}%" if rd.get("price_reduced_share") is not None else "—"
+    rd_pending_fmt = f"{round(rd['pending_ratio'],2)}" if rd.get("pending_ratio") is not None else "—"
+
+    def _metro_badge(rank_mm):
+        if rank_mm is None: return ""
+        if rank_mm <= -5:  return '<span style="background:#E6F2F0;color:#005E53;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▲ RISING</span>'
+        if rank_mm >= 5:   return '<span style="background:#FDF0F0;color:#D64045;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▼ COOLING</span>'
+        return '<span style="background:#F5F5F5;color:#6B7280;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">STABLE</span>'
+
+    def _demand_bar(score):
+        if score is None: return ""
+        pct = min(max(round(score), 0), 100)
+        color = "#3EB4A5" if pct >= 60 else ("#FAC515" if pct >= 40 else "#D64045")
+        return f'<div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:{pct}%;background:{color};height:4px;border-radius:3px;"></div></div><div style="font-family:\'DM Mono\',monospace;font-size:.45rem;color:var(--muted);margin-top:.15rem;">Demand score {pct}/100</div>'
+
+    metros_html = ""
+    if hot_metros:
+        metros_html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;margin-top:.75rem;">'
+        for m in hot_metros:
+            city      = m["name"].rsplit(",", 1)[0].strip()
+            price_str = _dollar(m.get("listing_price"))
+            dom_str   = f"{int(m['dom'])}d" if m.get("dom") is not None else "—"
+            badge     = _metro_badge(m.get("rank_mm"))
+            bar       = _demand_bar(m.get("demand_score"))
+            metros_html += f"""<div style="background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;border-top:3px solid var(--nz-blue);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem;">
+          <div style="font-size:clamp(.7rem,1.1vw,.8rem);font-weight:600;color:var(--ink);line-height:1.3;">{city}</div>
+          {badge}
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:.48rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #{m['hotness_rank']}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.4rem;">
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median Price</div>
+            <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">{price_str}</div>
+          </div>
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median DOM</div>
+            <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">{dom_str}</div>
+          </div>
+        </div>
+        {bar}
+      </div>"""
+        metros_html += '</div>'
+    else:
+        metros_html = '<div style="font-family:\'DM Mono\',monospace;font-size:.6rem;color:var(--muted);padding:.5rem 0;">No metro hotness data available for this state.</div>'
+
+    realtor_section_html = ""
+    if rd:
+        realtor_section_html = f"""
+  <div class="section-hd" style="border-left-color:var(--nz-teal-bright);background:var(--nz-teal-bright-light);">
+    <span class="section-hd-label" style="color:var(--nz-teal-bright);">📋 Realtor.com Market Data · {name}</span>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h3>Market Indicators</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
+    <div style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;border-left:3px solid var(--nz-blue);">
+      <div style="font-family:'DM Mono',monospace;font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--nz-blue);font-weight:700;margin-bottom:.6rem;">🏦 LO Market Signal · {{rd_period_label}}</div>
+      {{lo_signal_html}}
+    </div>
+    <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">
+      <div class="stat-item">
+        <div class="si-label">Median Listing Price</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_price_fmt}}</div>
+        <div class="si-chg" style="color:var(--muted);">{{rd_price_yy}} YoY</div>
+      </div>
+      <div class="stat-item">
+        <div class="si-label">Median Days on Market</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_dom_fmt}}</div>
+        <div class="si-chg" style="color:var(--muted);">{{rd_dom_yy}}</div>
+      </div>
+      <div class="stat-item">
+        <div class="si-label">Active Listings</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_active_fmt}}</div>
+        <div class="si-chg" style="color:var(--muted);">{{rd_active_yy}} YoY</div>
+      </div>
+      <div class="stat-item">
+        <div class="si-label">New Listings</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_new_fmt}}</div>
+        <div class="si-chg" style="color:var(--muted);">{{rd_new_yy}} YoY</div>
+      </div>
+      <div class="stat-item">
+        <div class="si-label">Price Reduced Share</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_cut_fmt}}</div>
+        <div class="si-chg" style="color:var(--muted);">of active listings</div>
+      </div>
+      <div class="stat-item">
+        <div class="si-label">Pending Ratio</div>
+        <div class="si-val" style="font-size:clamp(.9rem,1.8vw,1.2rem);">{{rd_pending_fmt}}</div>
+        <div class="si-chg" style="color:var(--muted);">pending ÷ active</div>
+      </div>
+    </div>
+    <div class="sb"><div class="sd"></div><span>Realtor.com Research · State-level inventory data · Updated monthly</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="ph"><h3>Hottest Markets in {name}</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
+    <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted);margin-bottom:.25rem;">Top metros by national hotness rank (supply + demand composite) · {{rd_period_label}}</div>
+    {{metros_html}}
+    <div class="sb" style="margin-top:1rem;"><div class="sd"></div><span>Realtor.com Hotness Index · Metro-level · Higher demand score = more buyer activity relative to supply</span></div>
+  </div>"""
+
     return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{name} Housing Market · Newzip Market Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{{
@@ -2202,15 +2513,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread):
     <div class="sb"><div class="sd"></div><span>Freddie Mac PMMS via FRED · National rates · State-specific rates may vary slightly</span></div>
   </div>
 
-  <div class="panel" style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);border:1px solid var(--border);">
-    <div style="padding:1.5rem;text-align:center;">
-      <div style="font-size:clamp(.8rem,1.5vw,1rem);font-weight:600;color:var(--ink);margin-bottom:.5rem;">More local data coming soon</div>
-      <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.8vw,.65rem);color:var(--muted);max-width:500px;margin:0 auto;line-height:1.7;">
-        We're adding Redfin metro-level data, FRED state housing indicators, and permit activity for {name}.
-        <br>Check back soon — or <a href="../index.html" style="color:var(--nz-blue);text-decoration:underline;">return to the national overview</a>.
-      </div>
-    </div>
-  </div>
+  {realtor_section_html}
 
 </main>
 
@@ -2239,8 +2542,10 @@ if __name__ == "__main__":
     news_fortune = fetch_fortune_news()
     news_inman   = fetch_inman_news()
     pending      = fetch_pending()
-    redfin_market = fetch_redfin_market()
-    zillow_market = fetch_zillow_market()
+    redfin_market    = fetch_redfin_market()
+    zillow_market    = fetch_zillow_market()
+    realtor_state    = fetch_realtor_state()
+    realtor_hotness  = fetch_realtor_hotness()
 
     # Extract state-level data from Zillow result
     state_data = zillow_market.pop("state_data", {})
@@ -2260,7 +2565,9 @@ if __name__ == "__main__":
         written = 0
         for abbr, sd in state_data.items():
             try:
-                state_html = build_state_page(abbr, sd, pmms, rates, spread)
+                state_html = build_state_page(abbr, sd, pmms, rates, spread,
+                                              realtor_state=realtor_state,
+                                              realtor_hotness=realtor_hotness)
                 state_html = state_html.replace("{LOGO_SRC}", LOGO_SRC)
                 with open(f"states/{abbr}.html","w",encoding="utf-8") as f:
                     f.write(state_html)
@@ -2282,3 +2589,4 @@ if __name__ == "__main__":
     print(f"  Zillow ZHVI  : ${zillow_market.get('zhvi'):,} ({zillow_market.get('zhvi_yoy'):+}% YoY)")
     print(f"  State pages  : {len(state_data)} states")
     print(f"{'='*60}\n")
+
