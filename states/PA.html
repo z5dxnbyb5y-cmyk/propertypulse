@@ -11,7 +11,7 @@
     --nz-red:#D64045;--nz-red-light:#FDF0F0;--gold:#D4943A;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:clamp(13px,1.5vw,15px)}
+  body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);font-size:clamp(14px,1.2vw,16px)}
   a{color:inherit;text-decoration:none}
   .topbar{background:white;border-bottom:2px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(76,109,225,.08)}
   .topbar-inner{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:1rem;padding:.75rem 0}
@@ -33,22 +33,22 @@
   .panel{background:white;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:1.5rem}
   .ph{padding:.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
   .ph h3{font-size:clamp(.78rem,1.1vw,.9rem);font-weight:600}
-  .badge{font-family:'DM Mono',monospace;font-size:.52rem;padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}
+  .badge{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.72rem);padding:.15rem .5rem;text-transform:uppercase;letter-spacing:.06em;border-radius:4px;font-weight:500}
   .badge-blue{background:var(--nz-blue-light);color:var(--nz-blue)}
   .badge-teal{background:var(--nz-teal-light);color:var(--nz-teal)}
-  .sb{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted)}
+  .sb{display:flex;align-items:center;gap:.4rem;padding:.5rem 1.25rem;background:var(--paper);border-top:1px solid var(--border);font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);color:var(--muted)}
   .sd{width:5px;height:5px;border-radius:50%;background:var(--nz-teal);flex-shrink:0}
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;padding:1.25rem}
   .stat-item{background:var(--paper);border-radius:8px;padding:1rem 1.25rem;border-left:3px solid var(--nz-blue)}
-  .si-label{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}
+  .si-label{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.72rem);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem}
   .si-val{font-size:clamp(1.1rem,2vw,1.5rem);font-weight:700;color:var(--ink)}
-  .si-chg{font-family:'DM Mono',monospace;font-size:.55rem;margin-top:.2rem}
+  .si-chg{font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);margin-top:.2rem}
   .rate-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border)}
   .rate-cell{background:white;padding:.85rem 1rem}
-  .rc-lbl{font-family:'DM Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
+  .rc-lbl{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.72rem);text-transform:uppercase;color:var(--muted);margin-bottom:.2rem}
   .rc-val{font-size:clamp(1rem,1.8vw,1.3rem);font-weight:700;color:var(--ink)}
-  .rc-sub{font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:.15rem}
-  footer{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:.54rem;color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
+  .rc-sub{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.7rem);color:var(--muted);margin-top:.15rem}
+  footer{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}
 </style>
 </head>
 <body>
@@ -155,7 +155,7 @@
   <div class="panel">
     <div class="ph"><h3>Market Indicators</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
     <div style="background:linear-gradient(135deg,#EEF1FC,#E8F7F5);border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;border-left:3px solid var(--nz-blue);">
-      <div style="font-family:'DM Mono',monospace;font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--nz-blue);font-weight:700;margin-bottom:.6rem;">🏦 LO Market Signal · March 2026</div>
+      <div style="font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.7rem);text-transform:uppercase;letter-spacing:.08em;color:var(--nz-blue);font-weight:700;margin-bottom:.6rem;">🏦 LO Market Signal · March 2026</div>
       <div style="display:flex;flex-direction:column;gap:.6rem;"><div style="font-size:clamp(.7rem,1.1vw,.8rem);line-height:1.7;color:var(--ink);">• Inventory is <strong>up 7.7% YoY</strong> and listing prices are <strong>flat 0.0% YoY</strong> with 12.4% of listings carrying a price cut. Pricing is stable — comps should be reliable.</div><div style="font-size:clamp(.7rem,1.1vw,.8rem);line-height:1.7;color:var(--ink);">• Homes are selling in a median <strong>53 days</strong> — a <strong>slower market</strong>. Pending ratio is <strong>0.68</strong> — strong buyer demand, expect competitive purchase timelines.</div><div style="font-size:clamp(.7rem,1.1vw,.8rem);line-height:1.7;color:var(--ink);">• New listings are <strong>declining 3.2% YoY</strong>. Fewer new listings may constrain purchase pipeline — focus on pre-approvals to capture demand early.</div></div>
     </div>
     <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">
@@ -195,58 +195,58 @@
 
   <div class="panel">
     <div class="ph"><h3>Hottest Markets in Pennsylvania</h3><span class="badge" style="background:var(--nz-teal-bright-light);color:var(--nz-teal-bright);border:1px solid var(--nz-teal-bright);">REALTOR.COM</span></div>
-    <div style="font-family:'DM Mono',monospace;font-size:.55rem;color:var(--muted);margin-bottom:.25rem;">Top metros by national hotness rank (supply + demand composite) · March 2026</div>
+    <div style="font-family:'DM Mono',monospace;font-size:clamp(.63rem,.73vw,.76rem);color:var(--muted);margin-bottom:.25rem;">Top metros by national hotness rank (supply + demand composite) · March 2026</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;margin-top:.75rem;"><div style="background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;border-top:3px solid var(--nz-blue);">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem;">
           <div style="font-size:clamp(.7rem,1.1vw,.8rem);font-weight:600;color:var(--ink);line-height:1.3;">Lancaster</div>
-          <span style="background:#F5F5F5;color:#6B7280;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">STABLE</span>
+          <span style="background:#F5F5F5;color:#6B7280;font-size:clamp(.58rem,.65vw,.68rem);font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">STABLE</span>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-size:.48rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #3</div>
+        <div style="font-family:'DM Mono',monospace;font-size:clamp(.58rem,.65vw,.68rem);text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #3</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.4rem;">
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median Price</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median Price</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">$420,725</div>
           </div>
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median DOM</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median DOM</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">30d</div>
           </div>
         </div>
-        <div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:95%;background:#3EB4A5;height:4px;border-radius:3px;"></div></div><div style="font-family:'DM Mono',monospace;font-size:.45rem;color:var(--muted);margin-top:.15rem;">Demand score 95/100</div>
+        <div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:95%;background:#3EB4A5;height:4px;border-radius:3px;"></div></div><div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);color:var(--muted);margin-top:.15rem;">Demand score 95/100</div>
       </div><div style="background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;border-top:3px solid var(--nz-blue);">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem;">
           <div style="font-size:clamp(.7rem,1.1vw,.8rem);font-weight:600;color:var(--ink);line-height:1.3;">Reading</div>
-          <span style="background:#FDF0F0;color:#D64045;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▼ COOLING</span>
+          <span style="background:#FDF0F0;color:#D64045;font-size:clamp(.58rem,.65vw,.68rem);font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▼ COOLING</span>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-size:.48rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #9</div>
+        <div style="font-family:'DM Mono',monospace;font-size:clamp(.58rem,.65vw,.68rem);text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #9</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.4rem;">
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median Price</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median Price</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">$322,450</div>
           </div>
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median DOM</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median DOM</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">24d</div>
           </div>
         </div>
-        <div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:89%;background:#3EB4A5;height:4px;border-radius:3px;"></div></div><div style="font-family:'DM Mono',monospace;font-size:.45rem;color:var(--muted);margin-top:.15rem;">Demand score 89/100</div>
+        <div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:89%;background:#3EB4A5;height:4px;border-radius:3px;"></div></div><div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);color:var(--muted);margin-top:.15rem;">Demand score 89/100</div>
       </div><div style="background:white;border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;border-top:3px solid var(--nz-blue);">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem;">
           <div style="font-size:clamp(.7rem,1.1vw,.8rem);font-weight:600;color:var(--ink);line-height:1.3;">Harrisburg-Carlisle</div>
-          <span style="background:#FDF0F0;color:#D64045;font-size:.48rem;font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▼ COOLING</span>
+          <span style="background:#FDF0F0;color:#D64045;font-size:clamp(.58rem,.65vw,.68rem);font-weight:700;padding:.15rem .4rem;border-radius:3px;letter-spacing:.04em;">▼ COOLING</span>
         </div>
-        <div style="font-family:'DM Mono',monospace;font-size:.48rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #21</div>
+        <div style="font-family:'DM Mono',monospace;font-size:clamp(.58rem,.65vw,.68rem);text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:.2rem;">National rank #21</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-top:.4rem;">
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median Price</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median Price</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">$337,450</div>
           </div>
           <div>
-            <div style="font-family:'DM Mono',monospace;font-size:.45rem;text-transform:uppercase;color:var(--muted);">Median DOM</div>
+            <div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);text-transform:uppercase;color:var(--muted);">Median DOM</div>
             <div style="font-size:clamp(.7rem,1vw,.78rem);font-weight:700;color:var(--ink);">35d</div>
           </div>
         </div>
-        <div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:85%;background:#3EB4A5;height:4px;border-radius:3px;"></div></div><div style="font-family:'DM Mono',monospace;font-size:.45rem;color:var(--muted);margin-top:.15rem;">Demand score 85/100</div>
+        <div style="margin-top:.35rem;background:#E2E5F0;border-radius:3px;height:4px;width:100%;"><div style="width:85%;background:#3EB4A5;height:4px;border-radius:3px;"></div></div><div style="font-family:'DM Mono',monospace;font-size:clamp(.55rem,.6vw,.65rem);color:var(--muted);margin-top:.15rem;">Demand score 85/100</div>
       </div></div>
     <div class="sb" style="margin-top:1rem;"><div class="sd"></div><span>Realtor.com Hotness Index · Metro-level · Higher demand score = more buyer activity relative to supply</span></div>
   </div>
@@ -254,7 +254,7 @@
 </main>
 
 <footer>
-  <div>Newzip Market Tracker · Pennsylvania · Apr 22, 2026 03:37 PM UTC · Not financial advice</div>
+  <div>Newzip Market Tracker · Pennsylvania · Apr 22, 2026 03:50 PM UTC · Not financial advice</div>
   <a href="../index.html" style="color:var(--nz-blue);">← National Overview</a>
 </footer>
 </body>
