@@ -851,9 +851,9 @@ def fetch_pending():
         date_str = datetime.datetime.strptime(current["date"], "%Y-%m-%d").strftime("%b %Y")
     except:
         date_str = current["date"]
-    # FRED EXHOSLUSM495S is in actual units — divide by 1,000,000 for millions
-    cur_m  = round(current['val'] / 1_000_000, 2)
-    prev_m = round(prev_mo['val'] / 1_000_000, 2) if prev_mo else None
+    # FRED EXHOSLUSM495S is in Thousands of Units — divide by 1,000 to get millions
+    cur_m  = round(current['val'] / 1_000, 2)
+    prev_m = round(prev_mo['val'] / 1_000, 2) if prev_mo else None
     if mom is not None and yoy is not None:
         print(f"  Existing Home Sales: {cur_m:.2f}M SAAR ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
     else:
@@ -864,7 +864,7 @@ def fetch_pending():
         "yoy":     yoy,
         "mom":     mom,
         "date":    date_str,
-        "history": [{"val": round(o["val"] / 1_000_000, 2), "date": o["date"]} for o in valid[:6]],
+        "history": [{"val": round(o["val"] / 1_000, 2), "date": o["date"]} for o in valid[:6]],
     }
 
 
