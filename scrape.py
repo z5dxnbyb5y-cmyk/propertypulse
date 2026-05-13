@@ -1345,6 +1345,107 @@ def _summary_fallback(rates, pmms, spread, pending, redfin_market=None):
     return rows
 
 
+# ── AMPLITUDE ANALYTICS ───────────────────────────────────────────────────────
+# Injected into every generated page (index.html and all states/*.html).
+# Uses a plain string constant so JS curly braces don't conflict with f-string
+# interpolation in the build functions below.
+
+AMPLITUDE_SNIPPET = """
+<!-- Amplitude Tracking Code -->
+    <script type="text/javascript">
+      !(function () {
+        "use strict";
+        !(function (e, t) {
+          var r = e.amplitude || { _q: [], _iq: {} };
+          if (r.invoked) e.console && console.error && console.error("Amplitude snippet has been loaded.");
+          else {
+            var n = function (e, t) {
+                e.prototype[t] = function () {
+                  return (this._q.push({ name: t, args: Array.prototype.slice.call(arguments, 0) }), this);
+                };
+              },
+              s = function (e, t, r) {
+                return function (n) {
+                  e._q.push({ name: t, args: Array.prototype.slice.call(r, 0), resolve: n });
+                };
+              },
+              o = function (e, t, r) {
+                e._q.push({ name: t, args: Array.prototype.slice.call(r, 0) });
+              },
+              i = function (e, t, r) {
+                e[t] = function () {
+                  if (r) return { promise: new Promise(s(e, t, Array.prototype.slice.call(arguments))) };
+                  o(e, t, Array.prototype.slice.call(arguments));
+                };
+              },
+              a = function (e) {
+                for (var t = 0; t < m.length; t++) i(e, m[t], !1);
+                for (var r = 0; r < g.length; r++) i(e, g[r], !0);
+              };
+            r.invoked = !0;
+            var c = t.createElement("script");
+            ((c.type = "text/javascript"),
+              (c.integrity = "sha384-2k2X3w99Z5Uj5Sc0lWC9jy7N/ej+XBzXS9mU6cis7m5oPeM+RjaPtLzz2NPuuw/U"),
+              (c.crossOrigin = "anonymous"),
+              (c.async = !0),
+              (c.src = "https://cdn.amplitude.com/libs/analytics-browser-2.4.1-min.js.gz"),
+              (c.onload = function () {
+                e.amplitude.runQueuedFunctions || console.log("[Amplitude] Error: could not load SDK");
+              }));
+            var u = t.getElementsByTagName("script")[0];
+            u.parentNode.insertBefore(c, u);
+            for (
+              var l = function () {
+                  return ((this._q = []), this);
+                },
+                p = ["add", "append", "clearAll", "prepend", "set", "setOnce", "unset", "preInsert", "postInsert", "remove", "getUserProperties"],
+                d = 0;
+              d < p.length;
+              d++
+            )
+              n(l, p[d]);
+            r.Identify = l;
+            for (
+              var f = function () {
+                  return ((this._q = []), this);
+                },
+                v = ["getEventProperties", "setProductId", "setQuantity", "setPrice", "setRevenue", "setRevenueType", "setEventProperties"],
+                y = 0;
+              y < v.length;
+              y++
+            )
+              n(f, v[y]);
+            r.Revenue = f;
+            var m = ["getDeviceId", "setDeviceId", "getSessionId", "setSessionId", "getUserId", "setUserId", "setOptOut", "setTransport", "reset", "extendSession"],
+              g = ["init", "add", "remove", "track", "logEvent", "identify", "groupIdentify", "setGroup", "revenue", "flush"];
+            (a(r),
+              (r.createInstance = function (e) {
+                return ((r._iq[e] = { _q: [] }), a(r._iq[e]), r._iq[e]);
+              }),
+              (e.amplitude = r));
+          }
+        })(window, document);
+      })();
+    </script>
+
+    <script src="https://cdn.amplitude.com/libs/plugin-session-replay-browser-0.10.1-min.js.gz"></script>
+
+    <script type="text/javascript">
+      amplitude.init("e8ae9cf75adce21904cb4423d3d80727", {
+        defaultTracking: {
+          pageViews: true,
+          attribution: false,
+          sessions: true,
+          formInteractions: false,
+          fileDownloads: false,
+        },
+      });
+
+      const sessionReplayTracking = window.sessionReplay.plugin({ sampleRate: 1 });
+      amplitude.add(sessionReplayTracking);
+    </script>"""
+
+
 # ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
 def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread, redfin_market=None, zillow_market=None, state_data=None):
@@ -1668,6 +1769,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   .rate-card:hover{{box-shadow:0 6px 20px rgba(76,109,225,.13);transform:translateY(-2px)}}
   /* Count-up numbers */
   .countup{{display:inline}}</style>
+{AMPLITUDE_SNIPPET}
 </head>
 <body id="top">
 
@@ -2416,6 +2518,7 @@ def build_state_page(abbr, state_zhvi, pmms, rates, spread, realtor_state=None, 
   .rc-sub{{font-family:'DM Mono',monospace;font-size:clamp(.6rem,.7vw,.7rem);color:var(--muted);margin-top:.15rem}}
   footer{{max-width:1280px;margin:0 auto;padding:1.5rem;font-family:'DM Mono',monospace;font-size:clamp(.62rem,.72vw,.74rem);color:var(--muted);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}}
 </style>
+{AMPLITUDE_SNIPPET}
 </head>
 <body>
 <div class="topbar">
