@@ -206,7 +206,8 @@ def fetch_pmms():
         dt = datetime.datetime.strptime(d30,"%Y-%m-%d")
         date_str = dt.strftime("%b %d, %Y")
     except: date_str = d30
-    print(f"  PMMS 30Y:{r30:.2f}% 15Y:{r15:.2f}% ({date_str})")
+    r15_str = f"{r15:.2f}%" if r15 is not None else "N/A"
+    print(f"  PMMS 30Y:{r30:.2f}% 15Y:{r15_str} ({date_str})")
     return {"rate_30y":round(r30,2),"rate_15y":round(r15,2) if r15 else None,
             "prev_30y":round(p30,2) if p30 else None,"prev_15y":round(p15,2) if p15 else None,
             "date":date_str,"yago_30y":round(r30_yago,2) if r30_yago else None}
@@ -2692,4 +2693,3 @@ if __name__ == "__main__":
     print(f"  Zillow ZHVI  : ${zillow_market.get('zhvi'):,} ({zillow_market.get('zhvi_yoy'):+}% YoY)")
     print(f"  State pages  : {len(state_data)} states")
     print(f"{'='*60}\n")
-
