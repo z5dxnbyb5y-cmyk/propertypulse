@@ -15,6 +15,50 @@ FANNIE_CLIENT_SECRET = os.environ.get("FANNIE_CLIENT_SECRET", "")
 FANNIE_BASE          = "https://api.fanniemae.com"
 ANTHROPIC_API_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# Vintage of the hardcoded Fannie Mae ESR numbers used when the API is unavailable.
+# Change these two lines (and the values they describe) whenever the fallback is refreshed.
+ESR_FALLBACK_DATE  = datetime.date(2026, 3, 1)
+ESR_FALLBACK_SHORT = ESR_FALLBACK_DATE.strftime("%b %Y")   # "Mar 2026"
+ESR_FALLBACK_LONG  = ESR_FALLBACK_DATE.strftime("%B %Y")   # "March 2026"
+
+# Scheduled FOMC meetings (start, end) — federalreserve.gov/monetarypolicy/fomccalendars.htm
+# Extend this list when the Fed publishes the next year's calendar.
+FOMC_MEETINGS = [
+    ((2026, 1, 27), (2026, 1, 28)), ((2026, 3, 17), (2026, 3, 18)),
+    ((2026, 4, 28), (2026, 4, 29)), ((2026, 6, 16), (2026, 6, 17)),
+    ((2026, 7, 28), (2026, 7, 29)), ((2026, 9, 15), (2026, 9, 16)),
+    ((2026, 10, 27), (2026, 10, 28)), ((2026, 12, 8), (2026, 12, 9)),
+    ((2027, 1, 26), (2027, 1, 27)), ((2027, 3, 16), (2027, 3, 17)),
+    ((2027, 4, 27), (2027, 4, 28)), ((2027, 6, 8), (2027, 6, 9)),
+    ((2027, 7, 27), (2027, 7, 28)), ((2027, 9, 14), (2027, 9, 15)),
+    ((2027, 10, 26), (2027, 10, 27)), ((2027, 12, 7), (2027, 12, 8)),
+]
+
+def next_fomc(today=None):
+    """Next FOMC meeting that has not finished yet, e.g. 'October 27–28, 2026'. None if the list has run out."""
+    today = today or TODAY
+    for start, end in FOMC_MEETINGS:
+        s_d, e_d = datetime.date(*start), datetime.date(*end)
+        if e_d >= today:
+            if s_d.month == e_d.month:
+                return f"{s_d.strftime('%B')} {s_d.day}–{e_d.day}, {e_d.year}"
+            return f"{s_d.strftime('%B')} {s_d.day} – {e_d.strftime('%B')} {e_d.day}, {e_d.year}"
+    return None
+
+def months_old(d, today=None):
+    """Whole months between date d and today."""
+    today = today or TODAY
+    return max(0, (today.year - d.year) * 12 + (today.month - d.month))
+
+def data_age(period_end, source=None, stale_days=75):
+    """Describe how old a dataset is. Returns {'label','months','stale'}."""
+    try:
+        d = datetime.datetime.strptime(str(period_end)[:10], "%Y-%m-%d").date()
+    except Exception:
+        return {"label": "date unknown", "months": None, "stale": True}
+    return {"label": d.strftime("%b %Y"), "months": months_old(d),
+            "stale": source == "fallback" or (TODAY - d).days > stale_days}
+
 # Debug: print key lengths at startup (values stay hidden, just confirms receipt)
 def _debug_secrets():
     fk = (os.environ.get("FRED_API_KEY") or "").strip()
@@ -159,6 +203,43 @@ def fred_two(series_id):
     if len(valid) >= 2: return valid[0][0], valid[1][0], valid[0][1]
     elif len(valid) == 1: return valid[0][0], valid[0][0], valid[0][1]
     return None, None, None
+
+# ── FED TARGET RANGE ──────────────────────────────────────────────────────────
+
+def fetch_fed_target():
+    """Fed funds target range from FRED (DFEDTARL / DFEDTARU, daily). {} if unavailable."""
+    print("Fetching Fed target range from FRED...")
+    up = fred("DFEDTARU", limit=400)
+    lo = fred("DFEDTARL", limit=400)
+    try:
+        upper, lower = float(up[0]["value"]), float(lo[0]["value"])
+    except Exception:
+        print("  Fed target range unavailable")
+        return {}
+    result = {"upper": upper, "lower": lower, "changed_on": None, "delta_bps": None}
+    for newer, older in zip(up, up[1:]):
+        try:
+            if float(older["value"]) != float(newer["value"]):
+                result["changed_on"] = datetime.datetime.strptime(newer["date"], "%Y-%m-%d").strftime("%b %d, %Y")
+                result["delta_bps"]  = round((float(newer["value"]) - float(older["value"])) * 100)
+                break
+        except Exception:
+            continue
+    print(f"  Fed target: {lower:.2f}–{upper:.2f}% (last change: {result['changed_on']} {result['delta_bps']})")
+    return result
+
+def fed_note_parts(fed):
+    """(range_str, status_str, next_meeting_str) for the Fed banner; any may be None."""
+    fed = fed or {}
+    rng = f"{fed['lower']:.2f}–{fed['upper']:.2f}%" if fed.get("upper") is not None else None
+    status = None
+    if rng:
+        if fed.get("changed_on"):
+            verb = "Cut" if fed["delta_bps"] < 0 else "Raised"
+            status = f"{verb} {abs(fed['delta_bps'])}bps {fed['changed_on']}"
+        else:
+            status = "Unchanged for over a year"
+    return rng, status, next_fomc()
 
 # ── OBMMI ─────────────────────────────────────────────────────────────────────
 
@@ -525,7 +606,7 @@ def fetch_redfin_market():
         print(f"  Redfin: {result['period_begin']} → {result['period_end']} | inventory {result['inventory']} | DOM {result['median_dom']}d | supply {result['months_of_supply']}mo")
         return result
     except Exception as e:
-        print(f"  Redfin: fetch failed ({e}), using Feb 2026 fallback")
+        print(f"  Redfin: fetch failed ({e}), using hardcoded {fallback['period_end']} fallback")
         return fallback
 
 
@@ -852,9 +933,19 @@ def fetch_pending():
         date_str = datetime.datetime.strptime(current["date"], "%Y-%m-%d").strftime("%b %Y")
     except:
         date_str = current["date"]
-    # FRED EXHOSLUSM495S is in Thousands of Units — divide by 1,000 to get millions
-    cur_m  = round(current['val'] / 1_000, 2)
-    prev_m = round(prev_mo['val'] / 1_000, 2) if prev_mo else None
+    # FRED EXHOSLUSM495S is reported in Number of Units (e.g. 3,980,000) — convert to millions.
+    def _millions(v):
+        m = v / 1_000_000
+        if not 1 <= m <= 10:   # existing-home sales have always been 1–10M SAAR; anything else is a units change
+            raise ValueError(f"EXHOSLUSM495S value {v} is outside the expected range — check FRED units")
+        return round(m, 2)
+    try:
+        cur_m  = _millions(current['val'])
+        prev_m = _millions(prev_mo['val']) if prev_mo else None
+        history = [{"val": _millions(o["val"]), "date": o["date"]} for o in valid[:6]]
+    except ValueError as e:
+        print(f"  WARN: {e} — hiding Existing Home Sales panel")
+        return {"value": None, "prev": None, "date": None, "yoy": None, "mom": None}
     if mom is not None and yoy is not None:
         print(f"  Existing Home Sales: {cur_m:.2f}M SAAR ({date_str}) MoM:{mom:+.1f}% YoY:{yoy:+.1f}%")
     else:
@@ -865,7 +956,7 @@ def fetch_pending():
         "yoy":     yoy,
         "mom":     mom,
         "date":    date_str,
-        "history": [{"val": round(o["val"] / 1_000, 2), "date": o["date"]} for o in valid[:6]],
+        "history": history,
     }
 
 
@@ -913,28 +1004,45 @@ def build_housing_pulse_html(redfin, zillow):
     nl_yoy    = redfin.get("new_listings_yoy")
     stl       = redfin.get("avg_sale_to_list")
     sold_above= redfin.get("pct_sold_above_list")
-    period    = redfin.get("period_end", "")
-    try:
-        pd_str = datetime.datetime.strptime(period, "%Y-%m-%d").strftime("%b %Y")
-    except:
-        pd_str = period or "Latest"
+    age    = data_age(redfin.get("period_end", ""), redfin.get("source"))
+    pd_str = age["label"]
+    stale  = age["stale"]
 
     zhvi      = zillow.get("zhvi")
     zhvi_yoy  = zillow.get("zhvi_yoy")
     zhvi_mom  = zillow.get("zhvi_mom")
     zhvi_per  = zillow.get("period", "")
 
-    price_str = f"${price:,.0f}" if price else (f"${zhvi:,.0f} (ZHVI)" if zhvi else "N/A")
-    price_yoy_val = price_yoy if price_yoy is not None else zhvi_yoy
+    # When Redfin is stale, the price cell uses the live Zillow index instead of an old sale price.
+    zhvi_live = bool(zhvi) and zillow.get("source") == "zillow"
+    price_lbl = "Median Home Price"
+    if stale and zhvi_live:
+        price_str, price_yoy_val = f"${zhvi:,.0f}", zhvi_yoy
+        price_lbl = f"Typical Home Value · Zillow ZHVI {zhvi_per}"
+    else:
+        price_str = f"${price:,.0f}" if price else (f"${zhvi:,.0f} (ZHVI)" if zhvi else "N/A")
+        price_yoy_val = price_yoy if price_yoy is not None else zhvi_yoy
+
+    if stale:
+        old = f"{age['months']} months old" if age["months"] else "out of date"
+        signal_desc += f" (as of {pd_str})"
+        stale_html = (f'<div style="margin:.75rem 1.25rem 0;padding:.55rem .8rem;border:1px solid var(--nz-red);border-radius:6px;'
+                      f'font-size:.72rem;color:var(--nz-red);font-weight:600;">Redfin feed unavailable — these figures are from '
+                      f'{pd_str} ({old}), not current conditions.</div>')
+        footer = f"Redfin Data Center · redfin.com/news/data-center · Last available period: {pd_str} · Feed currently unavailable"
+    else:
+        stale_html = ""
+        footer = f"Redfin Data Center · redfin.com/news/data-center · {pd_str} · Updated monthly · Cite Redfin when sharing"
 
     return f"""
+    {stale_html}
     <div class="hp-signal {signal_cls}">
       <div class="hp-signal-label">{signal_label}</div>
       <div class="hp-signal-desc">{signal_desc}</div>
     </div>
     <div class="hp-grid">
       <div class="hp-cell">
-        <div class="hp-metric">Median Home Price</div>
+        <div class="hp-metric">{price_lbl}</div>
         <div class="hp-val">{price_str}</div>
         {_yoy_badge(price_yoy_val)}
       </div>
@@ -974,7 +1082,7 @@ def build_housing_pulse_html(redfin, zillow):
         <div style="font-size:.6rem;color:var(--muted);margin-top:.2rem">Share of homes sold over ask</div>
       </div>
     </div>
-    <div class="sb"><div class="sd"></div><span>Redfin Data Center · redfin.com/news/data-center · {pd_str} · Updated weekly Wednesdays · Cite Redfin when sharing</span></div>
+    <div class="sb"><div class="sd"></div><span>{footer}</span></div>
 """
 
 
@@ -1061,41 +1169,34 @@ def build_pending_html(pending):
 def build_fannie_rows(housing):
     year = TODAY.year
     rates = housing.get("mortgage_rate_30y", {})
-    has_live = bool(rates)
 
-    # Fannie Mae March 2026 ESR published forecast — used when API auth is unavailable.
-    # Source: Fannie Mae Economic & Strategic Research Group, March 2026 Housing Forecast
-    # Update these values each month once the ESR PDF is released.
+    # Published Fannie Mae ESR forecast (vintage: ESR_FALLBACK_DATE) — used when API auth is unavailable.
+    # Keys are absolute periods so old numbers can never be relabelled as a later year.
     ESR_FALLBACK = {
-        f"Q1 {year}":       6.60,
-        f"Q2 {year}":       6.50,
-        f"Q3 {year}":       6.40,
-        f"Q4 {year}":       6.30,
-        f"EOY {year+1}":    6.10,
+        "Q1 2026": 6.60, "Q2 2026": 6.50, "Q3 2026": 6.40, "Q4 2026": 6.30,
+        "EOY 2027": 6.10,
     }
+    quarter_end = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
 
-    quarters = [
-        (f"Q1 {year}",    f"Q1 {year}"),
-        (f"Q2 {year}",    f"Q2 {year}"),
-        (f"Q3 {year}",    f"Q3 {year}"),
-        (f"Q4 {year}",    f"Q4 {year}"),
-        (f"EOY {year+1}", f"Full Year {year+1}"),
-    ]
+    # A forecast table only lists periods that have not ended yet.
+    quarters = [(f"Q{q} {year}", f"Q{q} {year}") for q in (1, 2, 3, 4)
+                if datetime.date(year, *quarter_end[q]) >= TODAY]
+    quarters.append((f"EOY {year+1}", f"Full Year {year+1}"))
+
     rows = ""
     for key, label in quarters:
         live_val = rates.get(key)
         val      = live_val if live_val else ESR_FALLBACK.get(key)
         if val:
             cls = "fc-good" if val < 6.5 else ""
-            tag = "fc-tag-teal" if val < 6.5 else "fc-tag-neutral"
-            sig = "Below 6.5%" if val < 6.5 else "Above 6.5%"
             if live_val:
                 src = "Live · Fannie Mae API"
-                badge_cls = "fc-tag-teal"
+                badge_cls = "fc-tag-teal" if val < 6.5 else "fc-tag-neutral"
+                sig = "Below 6.5%" if val < 6.5 else "Above 6.5%"
             else:
-                src = "Est. · Fannie Mae Mar 2026 ESR"
+                src = f"Forecast made {ESR_FALLBACK_SHORT} · not updated since"
                 badge_cls = "fc-tag-neutral"
-                sig = "Est."
+                sig = f"{months_old(ESR_FALLBACK_DATE)} mo old"
             rows += (
                 f'\n<tr><td class="td-type">{label}</td>'
                 f'<td class="fc {cls}">{val:.2f}%</td>'
@@ -1106,8 +1207,8 @@ def build_fannie_rows(housing):
             rows += (
                 f'\n<tr><td class="td-type">{label}</td>'
                 f'<td class="fc fc-neu">—</td>'
-                f'<td class="fc fc-neu">—</td>'
-                f'<td><span class="fc-tag fc-tag-neutral">Pending</span></td></tr>'
+                f'<td class="fc fc-neu">No forecast available</td>'
+                f'<td><span class="fc-tag fc-tag-neutral">N/A</span></td></tr>'
             )
     return rows
 
@@ -1138,7 +1239,7 @@ def build_ticker(rates, pmms, hpsi, spread=None):
     TICKER_TIPS = {
         "PMMS 30Y":  f"Freddie Mac Primary Mortgage Market Survey · 30Y fixed · Weekly · As of {pdate}",
         "PMMS 15Y":  f"Freddie Mac PMMS · 15Y fixed · Weekly avg · As of {pdate}",
-        "FED RATE":  "Federal Reserve target rate · Currently on hold · Next meeting Apr 28–29, 2026",
+        "FED RATE":  "Federal Reserve target rate" + (f" · Next meeting {next_fomc()}" if next_fomc() else ""),
         "30Y/10Y":   "Spread between 30Y mortgage & 10Y Treasury · Tracks lender risk premium · Norm ~170bps",
         "HPSI":      "Fannie Mae Home Purchase Sentiment Index · Consumer housing confidence survey",
         "1YR AGO":   f"PMMS 30Y rate one year ago · Year-over-year comparison",
@@ -1198,7 +1299,7 @@ def build_summary(rates, pmms, spread, pending, housing, economic, redfin_market
     gdp   = economic.get("gdp")
     unemp = economic.get("unemployment")
     cpi   = economic.get("cpi")
-    econ_line = f"Fannie Mae ESR: GDP {gdp:.1f}%, UE {unemp:.1f}%, CPI {cpi:.1f}%" if gdp else "Fannie Mae Mar 2026 ESR: GDP ~2.3%, UE ~4.2%, CPI ~2.7%"
+    econ_line = f"Fannie Mae ESR: GDP {gdp:.1f}%, UE {unemp:.1f}%, CPI {cpi:.1f}%" if gdp else f"Fannie Mae {ESR_FALLBACK_SHORT} ESR (not updated since): GDP ~2.3%, UE ~4.2%, CPI ~2.7%"
 
     home_sales = housing.get("total_home_sales")
     sf_starts  = housing.get("sf_starts")
@@ -1224,6 +1325,11 @@ def build_summary(rates, pmms, spread, pending, housing, economic, redfin_market
     elif supply < 5: market_cond = f"a balanced market ({supply:.1f} months supply)"
     else:            market_cond = f"a buyer's market ({supply:.1f} months supply)"
 
+    rf_age   = data_age(rf.get("period_end", ""), rf.get("source"))
+    rf_stale = rf_age["stale"]
+    if rf_stale and zhvi and zhvi_yoy is not None and zl.get("source") == "zillow":
+        re_price = None   # don't quote an old sale price when a current Zillow value exists
+
     re_lines = []
     if supply: re_lines.append(f"Market conditions: {market_cond}")
     if dom and dom_yoy is not None: re_lines.append(f"Median days on market: {int(dom)} days ({dom_yoy:+g}d YoY — homes {'sitting longer' if dom_yoy > 0 else 'moving faster'} than last year)")
@@ -1231,23 +1337,32 @@ def build_summary(rates, pmms, spread, pending, housing, economic, redfin_market
     if price_drop: re_lines.append(f"Price drops: {price_drop:.1f}% of homes have had price reductions")
     if stl: re_lines.append(f"Sale-to-list ratio: {stl:.1f}% ({'buyers getting discounts' if stl < 99 else 'homes selling near or above ask'})")
     if re_price and re_price_yoy: re_lines.append(f"Median sale price: ${re_price:,.0f} ({re_price_yoy:+.1f}% YoY)")
-    elif zhvi and zhvi_yoy: re_lines.append(f"Zillow Home Value Index: ${zhvi:,.0f} ({zhvi_yoy:+.1f}% YoY)")
     re_context = "\n".join(f"- {l}" for l in re_lines) if re_lines else "- Real estate data unavailable"
+    zhvi_context = ""
+    if zhvi and zhvi_yoy is not None and not (re_price and re_price_yoy):
+        zhvi_context = f"\nHOME VALUES (Zillow Home Value Index, {zl.get('period') or 'latest month'}):\n- ${zhvi:,.0f} ({zhvi_yoy:+.1f}% YoY)\n"
+
+    re_header = f"REAL ESTATE MARKET (Redfin national data for {rf_age['label']})"
+    if rf_stale:
+        old = f"about {rf_age['months']} months old" if rf_age["months"] else "out of date"
+        re_header += (f"\nIMPORTANT: the Redfin feed is down, so these figures are {old}. They are NOT current. "
+                      f"Do not describe them as today's, this week's or current conditions. Build THE SIGNAL on the rate data above, "
+                      f"which is current. If you mention any figure from this section, say it is from {rf_age['label']}.")
 
     prompt = f"""You are a market strategist writing a daily briefing for loan officers (LOs) at a real estate company.
 
 Your audience is LOs who need to know: what is the market doing, and what should they DO about it today — whether that's a talking point with a client, a reason to call a buyer who's been sitting on the fence, or context for why now is or isn't a good time to act.
 
-Today's data ({TODAY_STR}):
+Today is {TODAY_STR}. Each block below states the date its data refers to:
 
 MORTGAGE RATES:
-- PMMS 30Y fixed: {r30:.2f}% ({bps30:+.1f}bps week-over-week, {yoy:+d}bps vs one year ago at {yago:.2f}%)
+- PMMS 30Y fixed, week of {pdate}: {r30:.2f}% ({bps30:+.1f}bps week-over-week, {yoy:+d}bps vs one year ago at {yago:.2f}%)
 - {obmmi_line}
 - 30Y/10Y spread: {spread_bps}bps ({spread_sig}) — norm ~170bps
 
-REAL ESTATE MARKET (Redfin national data):
+{re_header}
 {re_context}
-
+{zhvi_context}
 Write a "1-minute briefing" with exactly these three parts, each on its own line with the label in caps:
 
 THE SIGNAL: The single most actionable thing happening across rates AND the real estate market right now. Lead with what matters most to an LO today — inventory shift, rate trend, buyer opportunity, or seller leverage. Be specific with numbers.
@@ -1326,6 +1441,7 @@ def _summary_fallback(rates, pmms, spread, pending, redfin_market=None):
     dom    = rf.get("median_dom")
     dom_yoy = rf.get("median_dom_yoy")
     inv_yoy = rf.get("inventory_yoy")
+    rf_age  = data_age(rf.get("period_end", ""), rf.get("source"))
 
     # Build signal from most notable data point
     re_note = ""
@@ -1337,9 +1453,11 @@ def _summary_fallback(rates, pmms, spread, pending, redfin_market=None):
         else:
             re_note = f" Balanced market ({supply:.1f}mo supply), {int(dom)} days on market."
 
+    if re_note and rf_age["stale"]:
+        re_note = re_note.rstrip(".") + f" as of {rf_age['label']} (latest Redfin data available)."
     signal = f"30Y fixed {r30:.2f}% — {abs(bps):.0f}bps {dir_} WoW, {abs(yoy)}bps {'below' if yoy <= 0 else 'above'} last year.{re_note}"
     what   = f"{'Rates are cheaper than a year ago — use the YoY comparison as a buyer talking point.' if yoy < 0 else 'Rates are higher than a year ago — focus conversation on market conditions and negotiating power.'}"
-    watch  = "Thursday: Freddie Mac PMMS. Track whether inventory and days-on-market trends continue shifting toward buyers."
+    watch  = "Thursday: Freddie Mac PMMS." + (f" Next Fed meeting: {next_fomc()}." if next_fomc() else "")
     rows = f'<div class="brief-row"><span class="brief-lbl">The Signal</span><span class="brief-val">{signal}</span></div>'
     rows += f'<div class="brief-row"><span class="brief-lbl">What It Means for LOs</span><span class="brief-val">{what}</span></div>'
     rows += f'<div class="brief-row brief-row-last"><span class="brief-lbl">Watch For</span><span class="brief-val">{watch}</span></div>'
@@ -1449,7 +1567,7 @@ AMPLITUDE_SNIPPET = """
 
 # ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
-def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread, redfin_market=None, zillow_market=None, state_data=None):
+def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread, redfin_market=None, zillow_market=None, state_data=None, fed=None):
     rates_json     = json.dumps(rates)
     fortune_html   = build_news_items(news_fortune)
     inman_html     = build_news_items(news_inman, show_desc=True)
@@ -1487,15 +1605,42 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     hpsi_val     = f"{hpsi['value']}" if hpsi else "~73"
     hpsi_date    = hpsi["date"] if hpsi else "Feb 2026"
     # Mark as estimated if from fallback
-    gdp_src      = "Live · Fannie Mae API" if economic.get("gdp") else "Est. · Fannie Mae Mar 2026"
-    unemp_src    = "Live · Fannie Mae API" if economic.get("unemployment") else "Est. · Fannie Mae Mar 2026"
-    cpi_src      = "Live · Fannie Mae API" if economic.get("cpi") else "Est. · Fannie Mae Mar 2026"
-    tsy_src      = "Live · Fannie Mae API" if economic.get("treasury_10y") else "Est. · Fannie Mae Mar 2026"
+    gdp_src      = "Live · Fannie Mae API" if economic.get("gdp") else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
+    unemp_src    = "Live · Fannie Mae API" if economic.get("unemployment") else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
+    cpi_src      = "Live · Fannie Mae API" if economic.get("cpi") else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
+    tsy_src      = "Live · Fannie Mae API" if economic.get("treasury_10y") else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
 
-    fannie_date = housing.get("report_date") or economic.get("report_date") or "Latest"
+    fannie_live = bool(housing.get("report_date") or economic.get("report_date"))
+    fannie_date = housing.get("report_date") or economic.get("report_date") or ESR_FALLBACK_LONG
     try:
         fannie_date = datetime.datetime.strptime(fannie_date,"%Y-%m-%d").strftime("%B %Y")
     except: pass
+    esr_age = f"{months_old(ESR_FALLBACK_DATE)} months old"
+    # Honest source labels: "live" only when the API actually answered.
+    fannie_status = "Live via API" if fannie_live else f"API unavailable · estimates not updated since {ESR_FALLBACK_SHORT}"
+    fc_live       = bool(housing.get("mortgage_rate_30y"))
+    fc_status     = "Live via API" if fc_live else f"API unavailable · showing {ESR_FALLBACK_SHORT} forecast ({esr_age})"
+    fc_badge      = "Fannie Mae API" if fc_live else f"{ESR_FALLBACK_SHORT} ESR"
+    fc_footer     = ("Fannie Mae Housing Indicators API · Updated monthly" if fc_live else
+                     f"Fannie Mae API unavailable · Values are from the {ESR_FALLBACK_SHORT} ESR forecast and have not been updated since · Ended quarters are omitted")
+    hs_sub  = f"ESR Forecast {TODAY.year}" if housing.get("total_home_sales") else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
+    sfs_sub = f"Single-family {TODAY.year}" if housing.get("sf_starts") is not None else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
+
+    # Fed banner — range from FRED, next meeting from the published calendar
+    fed_rng, fed_status, fed_next = fed_note_parts(fed)
+    fed_heading = " · ".join(x for x in [
+        f"Federal Reserve — Target Range {fed_rng}" if fed_rng else "Federal Reserve",
+        fed_status, f"Next Meeting {fed_next}" if fed_next else None] if x)
+
+    # Year-over-year rate line in the risk panel uses the same live figure as the banner
+    if yago and yoy < 0:
+        rate_risk = (f'<span style="color:var(--nz-teal);font-weight:700;">↓ Positive:</span> Rates {abs(yoy):.0f}bps below year-ago '
+                     f'({r30:.2f}% vs {yago:.2f}%) — buyers better positioned than a year ago')
+    elif yago and yoy > 0:
+        rate_risk = (f'<span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Rates {abs(yoy):.0f}bps above year-ago '
+                     f'({r30:.2f}% vs {yago:.2f}%) — affordability tighter than a year ago')
+    else:
+        rate_risk = '<span style="font-weight:700;">→ Neutral:</span> Rates roughly unchanged from a year ago'
 
     obmmi_date = rates[0]["date"] if rates else "N/A"
     try: obmmi_date = datetime.datetime.strptime(obmmi_date,"%Y-%m-%d").strftime("%b %d, %Y")
@@ -1808,8 +1953,8 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
   <div class="fed-note reveal">
     <div class="fed-icon">🏦</div>
     <div>
-      <h4>Federal Reserve — Rate Held at 3.50–3.75% · Next Meeting April 28–29, 2026</h4>
-      <p>PMMS 30Y at <strong>{r30:.2f}%</strong> as of {pdate} — <strong>{abs(yoy):.0f}bps</strong> {"below" if yoy<=0 else "above"} a year ago ({yago:.2f}%). 10-Year Treasury forecast: <strong>{treasury10y}</strong>. Fannie Mae ESR report: <strong>{fannie_date}</strong>. OBMMI data as of <strong>{obmmi_date}</strong>.</p>
+      <h4>{fed_heading}</h4>
+      <p>PMMS 30Y at <strong>{r30:.2f}%</strong> as of {pdate} — <strong>{abs(yoy):.0f}bps</strong> {"below" if yoy<=0 else "above"} a year ago ({yago:.2f}%). 10-Year Treasury forecast: <strong>{treasury10y}</strong> ({tsy_src}). Fannie Mae ESR report: <strong>{fannie_date}</strong>{"" if fannie_live else " (not live)"}. OBMMI data as of <strong>{obmmi_date}</strong>.</p>
     </div>
   </div>
 
@@ -1860,12 +2005,12 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
             <div class="econ-cell">
               <div class="ec-label">Total Home Sales</div>
               <div class="ec-val">{home_sales}</div>
-              <div class="ec-sub">ESR Forecast {TODAY.year}</div>
+              <div class="ec-sub">{hs_sub}</div>
             </div>
             <div class="econ-cell">
               <div class="ec-label">SF Starts YoY</div>
               <div class="ec-val">{sf_starts}</div>
-              <div class="ec-sub">Single-family {TODAY.year}</div>
+              <div class="ec-sub">{sfs_sub}</div>
             </div>
           </div>
           <div class="econ-grid" style="border:1px solid var(--border);border-radius:6px;">
@@ -1891,7 +2036,7 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
             </div>
           </div>
         </div>
-        <div class="sb"><div class="sd"></div><span>Fannie Mae ESR APIs · {fannie_date}</span></div>
+        <div class="sb"><div class="sd"></div><span>Fannie Mae ESR · {fannie_date} · {fannie_status}</span></div>
       </div>
     </div>
   </div>
@@ -1903,10 +2048,10 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
       <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Slower GDP growth forecast — weaker economy supports lower rates but signals demand risk</div>
       <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Limited inventory despite lower rates — prices stay elevated, affordability constrained</div>
       <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Geopolitical events pushing oil &amp; Treasury yields higher near-term</div>
-      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Single-family starts forecast −6.2% YoY — supply constraints persist</div>
-      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-teal);font-weight:700;">↓ Positive:</span> Rates ~45bps below year-ago — spring 2026 buyers better positioned than 2025</div>
+      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);"><span style="color:var(--nz-red);font-weight:700;">↑ Risk:</span> Single-family starts forecast {sf_starts} YoY — supply constraints persist</div>
+      <div style="font-size:.73rem;line-height:1.75;color:var(--muted);">{rate_risk}</div>
     </div>
-    <div class="sb"><div class="sd"></div><span>Fannie Mae ESR Group · {fannie_date} Economic Forecast</span></div>
+    <div class="sb"><div class="sd"></div><span>Fannie Mae ESR Group · {fannie_date} Economic Forecast · {fannie_status} · Year-over-year rate line: live PMMS</span></div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════
@@ -1993,14 +2138,14 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
 
   <div class="two-col">
     <div>
-      <div class="slbl slbl-teal" id="forecast">Fannie Mae ESR Forecast · {fannie_date} · Live via API</div>
+      <div class="slbl slbl-teal" id="forecast">Fannie Mae ESR Forecast · {fc_status}</div>
       <div class="tbl-wrap tbl-wrap-teal" style="margin-bottom:0;">
-        <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">Fannie Mae API</span></div>
+        <div class="ph"><h3>30-Year Fixed Rate Forecast</h3><span class="badge badge-gold">{fc_badge}</span></div>
         <div class="tbl-scroll"><table class="ftable">
           <thead><tr><th>Period</th><th>Forecast</th><th>Source</th><th>Signal</th></tr></thead>
           <tbody>{fannie_rows_str}</tbody>
         </table></div>
-        <div class="sb"><div class="sd"></div><span>Fannie Mae Housing Indicators API · Est. values from Mar 2026 ESR when API unavailable · Auto-updated monthly</span></div>
+        <div class="sb"><div class="sd"></div><span>{fc_footer}</span></div>
       </div>
     </div>
     <div>
@@ -2639,6 +2784,7 @@ if __name__ == "__main__":
 
     rates    = fetch_obmmi()
     pmms     = fetch_pmms()
+    fed      = fetch_fed_target()
     housing  = fetch_fannie_housing()
     economic = fetch_fannie_economic()
     hpsi     = fetch_fannie_hpsi()
@@ -2655,7 +2801,7 @@ if __name__ == "__main__":
     state_data = zillow_market.pop("state_data", {})
 
     html = build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, pending, spread,
-                      redfin_market=redfin_market, zillow_market=zillow_market, state_data=state_data)
+                      redfin_market=redfin_market, zillow_market=zillow_market, state_data=state_data, fed=fed)
     html = html.replace("{LOGO_SRC}", LOGO_SRC)
 
     with open("index.html","w",encoding="utf-8") as f:
