@@ -121,22 +121,36 @@ def get_fannie_token():
 
     import base64 as _b64
 
-    # Fannie Mae uses Ping Identity (PingFederate) for OAuth2, not AWS Cognito.
+    # Fannie Mae uses Ping Identity (PingFederate) for OAuth2.
     # Primary: fmsso.fanniemae.com (confirmed via /.well-known/openid-configuration)
-    # Fallback: api.fanniemae.com proxy endpoint
-    endpoints = [
-        "https://fmsso.fanniemae.com/as/token.oauth2",
-        "https://api.fanniemae.com/v1/oauth2/token",
-    ]
-
-    # Basic Auth: base64(client_id:client_secret)
+    # Try both Basic Auth header AND body params — PingFederate accepts either.
     creds = _b64.b64encode(f"{FANNIE_CLIENT_ID}:{FANNIE_CLIENT_SECRET}".encode()).decode()
 
-    for endpoint in endpoints:
-        print(f"  Trying: {endpoint}")
-        raw = post(endpoint, {"grant_type": "client_credentials"},
-                   headers={"Authorization": f"Basic {creds}",
-                            "Content-Type": "application/x-www-form-urlencoded"})
+    attempts = [
+        # (endpoint, body, headers, label)
+        (
+            "https://fmsso.fanniemae.com/as/token.oauth2",
+            {"grant_type": "client_credentials"},
+            {"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
+            "fmsso Basic Auth",
+        ),
+        (
+            "https://fmsso.fanniemae.com/as/token.oauth2",
+            {"grant_type": "client_credentials", "client_id": FANNIE_CLIENT_ID, "client_secret": FANNIE_CLIENT_SECRET},
+            {"Content-Type": "application/x-www-form-urlencoded"},
+            "fmsso body params",
+        ),
+        (
+            "https://api.fanniemae.com/v1/oauth2/token",
+            {"grant_type": "client_credentials", "client_id": FANNIE_CLIENT_ID, "client_secret": FANNIE_CLIENT_SECRET},
+            {"Content-Type": "application/x-www-form-urlencoded"},
+            "api.fanniemae body params",
+        ),
+    ]
+
+    for endpoint, body, headers, label in attempts:
+        print(f"  Trying: {label}")
+        raw = post(endpoint, body, headers=headers)
         if raw:
             try:
                 data = json.loads(raw)
@@ -145,14 +159,14 @@ def get_fannie_token():
                     exp = int(data.get("expires_in", 3600))
                     _fannie_token = token
                     _fannie_token_expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=exp - 60)
-                    print(f"  Token OK from {endpoint} (expires {exp}s)")
+                    print(f"  Token OK via {label} (expires {exp}s)")
                     return _fannie_token
                 else:
-                    print(f"  No token in response from {endpoint}: {list(data.keys())}")
+                    print(f"  No token from {label}: {list(data.keys())}")
             except Exception as e:
-                print(f"  Parse error from {endpoint}: {e}")
+                print(f"  Parse error from {label}: {e}")
         else:
-            print(f"  No response from {endpoint}")
+            print(f"  No response from {label}")
 
     print("  All Fannie Mae token endpoints failed")
     _fannie_token_failed = True
