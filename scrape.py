@@ -17,9 +17,9 @@ ANTHROPIC_API_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # Vintage of the hardcoded Fannie Mae ESR numbers used when the API is unavailable.
 # Change these two lines (and the values they describe) whenever the fallback is refreshed.
-ESR_FALLBACK_DATE  = datetime.date(2026, 3, 1)
-ESR_FALLBACK_SHORT = ESR_FALLBACK_DATE.strftime("%b %Y")   # "Mar 2026"
-ESR_FALLBACK_LONG  = ESR_FALLBACK_DATE.strftime("%B %Y")   # "March 2026"
+ESR_FALLBACK_DATE  = datetime.date(2026, 10, 1)
+ESR_FALLBACK_SHORT = ESR_FALLBACK_DATE.strftime("%b %Y")   # "Oct 2026"
+ESR_FALLBACK_LONG  = ESR_FALLBACK_DATE.strftime("%B %Y")   # "October 2026"
 
 # Scheduled FOMC meetings (start, end) — federalreserve.gov/monetarypolicy/fomccalendars.htm
 # Extend this list when the Fed publishes the next year's calendar.
@@ -556,16 +556,16 @@ def fetch_redfin_market():
     print("Fetching Redfin national housing market data...")
     url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/national_market_tracker.tsv000.gz"
     fallback = {
-        "period_begin": "2026-02-01", "period_end": "2026-02-28",
-        "inventory": 1726907, "inventory_yoy": -0.04,
-        "median_dom": 66, "median_dom_yoy": 9,
-        "months_of_supply": 4.0, "months_of_supply_yoy": 0.0,
-        "new_listings": 472951, "new_listings_yoy": -4.8,
-        "median_sale_price": 429189, "median_sale_price_yoy": 0.9,
-        "homes_sold": 318107, "homes_sold_yoy": -3.7,
-        "pct_price_drops": 16.5, "pct_price_drops_yoy": 1.5,
-        "avg_sale_to_list": 98.2, "avg_sale_to_list_yoy": -0.27,
-        "pct_sold_above_list": 22.5, "pct_sold_above_list_yoy": -2.2,
+        "period_begin": "2026-08-01", "period_end": "2026-08-31",
+        "inventory": 1820000, "inventory_yoy": 5.4,
+        "median_dom": 42, "median_dom_yoy": 4,
+        "months_of_supply": 4.3, "months_of_supply_yoy": 0.3,
+        "new_listings": 490000, "new_listings_yoy": 2.1,
+        "median_sale_price": None, "median_sale_price_yoy": None,
+        "homes_sold": 310000, "homes_sold_yoy": -1.2,
+        "pct_price_drops": 18.2, "pct_price_drops_yoy": 1.7,
+        "avg_sale_to_list": 98.0, "avg_sale_to_list_yoy": -0.3,
+        "pct_sold_above_list": 20.1, "pct_sold_above_list_yoy": -2.4,
         "source": "fallback",
     }
     try:
@@ -1224,7 +1224,7 @@ def build_ticker(rates, pmms, hpsi, spread=None):
     items = [
         ("PMMS 30Y", f"{r30:.2f}%", "chup" if bps30<=0 else "chdn", f"{'▲' if bps30>0 else '▼'} {pdate}"),
         ("PMMS 15Y", f"{r15:.2f}%", "chup", "Weekly avg"),
-        ("FED RATE",  "3.50–3.75%", "", "HOLD"),
+        ("FED RATE",  "3.75–4.00%", "", "HOLD"),  # NOTE: build_ticker is unused; live rate comes from fed_note_parts() in build_html
     ]
     if spread and spread.get("spread_bps"):
         s_cls = "chdn" if spread["spread_bps"] <= 250 else "chup"
@@ -1597,13 +1597,13 @@ def build_html(rates, pmms, housing, economic, hpsi, news_fortune, news_inman, p
     home_sales   = f"~{housing.get('total_home_sales')}M" if housing.get("total_home_sales") else "~5.5M"
     sf_starts    = f"{housing.get('sf_starts'):+.1f}%" if housing.get("sf_starts") is not None else "−6.2%"
     # Use live Fannie Mae API data if available, otherwise fall back to latest known values
-    # Fallbacks from Fannie Mae March 2026 ESR report
-    gdp          = f"{economic.get('gdp'):.1f}%"          if economic.get("gdp")          else "~2.3%"
-    unemployment = f"{economic.get('unemployment'):.1f}%"  if economic.get("unemployment")  else "~4.2%"
-    cpi          = f"{economic.get('cpi'):.1f}%"           if economic.get("cpi")           else "~2.7%"
-    treasury10y  = f"{economic.get('treasury_10y'):.2f}%"  if economic.get("treasury_10y")  else "~4.3%"
+    # Fallbacks from Fannie Mae Oct 2026 ESR report
+    gdp          = f"{economic.get('gdp'):.1f}%"          if economic.get("gdp")          else "~1.8%"
+    unemployment = f"{economic.get('unemployment'):.1f}%"  if economic.get("unemployment")  else "~4.5%"
+    cpi          = f"{economic.get('cpi'):.1f}%"           if economic.get("cpi")           else "~2.4%"
+    treasury10y  = f"{economic.get('treasury_10y'):.2f}%"  if economic.get("treasury_10y")  else "~4.5%"
     hpsi_val     = f"{hpsi['value']}" if hpsi else "~73"
-    hpsi_date    = hpsi["date"] if hpsi else "Feb 2026"
+    hpsi_date    = hpsi["date"] if hpsi else "Aug 2026"
     # Mark as estimated if from fallback
     gdp_src      = "Live · Fannie Mae API" if economic.get("gdp") else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
     unemp_src    = "Live · Fannie Mae API" if economic.get("unemployment") else f"Est. · Fannie Mae {ESR_FALLBACK_SHORT}"
