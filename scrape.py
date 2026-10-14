@@ -103,7 +103,11 @@ _fannie_token_expiry = None
 _fannie_token_failed = False  # set True after first complete failure; skip retries
 
 def get_fannie_token():
-    """Authenticate with Fannie Mae Exchange APIs using AWS Cognito."""
+    """Authenticate with Fannie Mae Exchange APIs using Ping Identity SSO.
+    Token endpoint: https://fmsso.fanniemae.com/as/token.oauth2
+    Grant type: client_credentials (Basic Auth with client_id:client_secret)
+    Discovery: https://fmsso.fanniemae.com/.well-known/openid-configuration
+    """
     global _fannie_token, _fannie_token_expiry, _fannie_token_failed
     if _fannie_token_failed:
         return None  # already tried this run — don't retry
@@ -113,25 +117,22 @@ def get_fannie_token():
         print("  WARN: Fannie Mae credentials not set")
         return None
 
-    print("  Authenticating with Fannie Mae Exchange (Cognito)...")
+    print("  Authenticating with Fannie Mae Exchange (Ping Identity SSO)...")
 
-    # The Exchange by Fannie Mae uses AWS Cognito client credentials flow
-    # Token endpoint: https://cognito-idp.{region}.amazonaws.com/{userPoolId}/.well-known/jwks.json
-    # Auth via Cognito hosted UI token endpoint
     import base64 as _b64
 
-    # Try the standard Cognito token endpoint with client_credentials grant
-    # The Exchange uses us-east-1 region based on their infrastructure
-    cognito_endpoints = [
-        "https://auth.theexchange.fanniemae.com/oauth2/token",
-        "https://fanniemae.auth.us-east-1.amazoncognito.com/oauth2/token",
+    # Fannie Mae uses Ping Identity (PingFederate) for OAuth2, not AWS Cognito.
+    # Primary: fmsso.fanniemae.com (confirmed via /.well-known/openid-configuration)
+    # Fallback: api.fanniemae.com proxy endpoint
+    endpoints = [
+        "https://fmsso.fanniemae.com/as/token.oauth2",
         "https://api.fanniemae.com/v1/oauth2/token",
     ]
 
-    # Encode client credentials as Basic Auth (standard for Cognito client_credentials)
+    # Basic Auth: base64(client_id:client_secret)
     creds = _b64.b64encode(f"{FANNIE_CLIENT_ID}:{FANNIE_CLIENT_SECRET}".encode()).decode()
 
-    for endpoint in cognito_endpoints:
+    for endpoint in endpoints:
         print(f"  Trying: {endpoint}")
         raw = post(endpoint, {"grant_type": "client_credentials"},
                    headers={"Authorization": f"Basic {creds}",
