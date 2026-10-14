@@ -545,69 +545,129 @@ def fetch_fortune_news():
 
 def fetch_redfin_market():
     """
-    Pull national housing market data from Redfin's public S3 data center.
-    URL: redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/
-    File: national_market_tracker.tsv000.gz — updated weekly (Wednesdays).
-    Free to use with citation to Redfin.
-    Key fields: inventory, median_dom, months_of_supply, new_listings,
-                median_sale_price, homes_sold, pct_homes_with_price_drops,
-                avg_sale_to_list, pending_sales
+    Pull national housing market data from Realtor.com (NAR) public S3 CSV.
+    URL: econdata.s3-us-west-2.amazonaws.com/Reports/Core/RDC_Inventory_Core_Metrics_Country.csv
+    Updated monthly. No auth required. Accessible from GitHub Actions.
+    Key fields: active_listing_count, median_days_on_market, new_listing_count,
+                median_listing_price, price_reduced_count/share, pending_listing_count.
+    Note: median_sale_price and homes_sold not available (listing data only).
+    Fallback: committed data/redfin_national.csv → hardcoded Sep 2026 values.
     """
-    print("Fetching Redfin national housing market data...")
-    url = "https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/national_market_tracker.tsv000.gz"
-    fallback = {
-        "period_begin": "2026-08-01", "period_end": "2026-08-31",
-        "inventory": 1820000, "inventory_yoy": 5.4,
-        "median_dom": 42, "median_dom_yoy": 4,
-        "months_of_supply": 4.3, "months_of_supply_yoy": 0.3,
-        "new_listings": 490000, "new_listings_yoy": 2.1,
-        "median_sale_price": None, "median_sale_price_yoy": None,
-        "homes_sold": 310000, "homes_sold_yoy": -1.2,
-        "pct_price_drops": 18.2, "pct_price_drops_yoy": 1.7,
-        "avg_sale_to_list": 98.0, "avg_sale_to_list_yoy": -0.3,
-        "pct_sold_above_list": 20.1, "pct_sold_above_list_yoy": -2.4,
+    print("Fetching Realtor.com national housing market data...")
+    rdc_url = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Core/RDC_Inventory_Core_Metrics_Country.csv"
+
+    def _parse_rdc_row(row):
+        """Parse a row from Realtor.com RDC_Inventory_Core_Metrics_Country.csv.
+        month_date_yyyymm = YYYYMM integer. YOY fields are fractional (0.054 = 5.4%).
+        price_reduced_share is fractional (0.208 = 20.8%).
+        """
+        def _f(key):
+            try: return round(float(row[key]), 2)
+            except: return None
+        def _pct(key):
+            """Convert fractional YOY to percentage, e.g. 0.054 → 5.4."""
+            try: return round(float(row[key]) * 100, 1)
+            except: return None
+        ym = str(row.get("month_date_yyyymm", "")).strip()
+        if len(ym) == 6:
+            period_begin = f"{ym[:4]}-{ym[4:]}-01"
+            # last day of month
+            import calendar
+            yr, mo = int(ym[:4]), int(ym[4:])
+            last = calendar.monthrange(yr, mo)[1]
+            period_end = f"{ym[:4]}-{ym[4:]}-{last:02d}"
+        else:
+            period_begin = period_end = ""
+        return {
+            "period_begin":         period_begin,
+            "period_end":           period_end,
+            "inventory":            _f("active_listing_count"),
+            "inventory_yoy":        _pct("active_listing_count_yy"),
+            "median_dom":           _f("median_days_on_market"),
+            "median_dom_yoy":       _pct("median_days_on_market_yy"),
+            "months_of_supply":     None,   # not in RDC file
+            "months_of_supply_yoy": None,
+            "new_listings":         _f("new_listing_count"),
+            "new_listings_yoy":     _pct("new_listing_count_yy"),
+            "median_sale_price":    _f("median_listing_price"),   # listing price (close proxy)
+            "median_sale_price_yoy":_pct("median_listing_price_yy"),
+            "homes_sold":           None,   # not in RDC listing data
+            "homes_sold_yoy":       None,
+            "pct_price_drops":      round(float(row["price_reduced_share"]) * 100, 1) if row.get("price_reduced_share") else None,
+            "pct_price_drops_yoy":  _pct("price_reduced_share_yy"),
+            "avg_sale_to_list":     None,
+            "pct_sold_above_list":  None,
+            "source": "realtor",
+        }
+
+    def _parse_redfin_csv_row(row):
+        """Parse a row from the Redfin Data Center CSV (fallback)."""
+        def _f(key):
+            try: return round(float(row[key]), 2)
+            except: return None
+        return {
+            "period_begin":         row.get("PERIOD BEGIN", ""),
+            "period_end":           row.get("PERIOD END", ""),
+            "inventory":            _f("ACTIVE LISTINGS"),
+            "inventory_yoy":        _f("ACTIVE LISTINGS YOY (%)"),
+            "median_dom":           _f("MEDIAN DAYS ON MARKET (DAYS)"),
+            "median_dom_yoy":       _f("MEDIAN DAYS ON MARKET YOY (DAYS)"),
+            "months_of_supply":     None,
+            "months_of_supply_yoy": None,
+            "new_listings":         _f("NEW LISTINGS"),
+            "new_listings_yoy":     _f("NEW LISTINGS YOY (%)"),
+            "median_sale_price":    _f("MEDIAN SALE PRICE NSA ($)"),
+            "median_sale_price_yoy":_f("MEDIAN SALE PRICE NSA YOY (%)"),
+            "homes_sold":           _f("HOMES SOLD"),
+            "homes_sold_yoy":       _f("HOMES SOLD YOY (%)"),
+            "pct_price_drops":      None,
+            "pct_price_drops_yoy":  None,
+            "avg_sale_to_list":     None,
+            "pct_sold_above_list":  None,
+            "source": "redfin_csv",
+        }
+
+    # 1) Try live Realtor.com S3 CSV (no auth, accessible from GitHub Actions)
+    try:
+        req = urllib.request.Request(rdc_url, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            raw = resp.read().decode("utf-8")
+        rows = list(csv.DictReader(io.StringIO(raw)))
+        # File has one data row (most recent month)
+        if rows:
+            result = _parse_rdc_row(rows[-1])
+            print(f"  Realtor.com live: {result['period_begin']} | inv {result['inventory']} | DOM {result['median_dom']}d")
+            return result
+        print("  Realtor.com: empty file")
+    except Exception as e:
+        print(f"  Realtor.com fetch failed ({e}), trying committed Redfin CSV...")
+
+    # 2) Fall back to committed Redfin CSV (data/redfin_national.csv)
+    try:
+        csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "redfin_national.csv")
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        if rows:
+            result = _parse_redfin_csv_row(rows[0])   # newest-first
+            print(f"  Redfin CSV fallback: {result['period_begin']} | inv {result['inventory']} | DOM {result['median_dom']}d")
+            return result
+    except Exception as e:
+        print(f"  Redfin CSV fallback failed ({e}), using hardcoded values")
+
+    # 3) Last-resort hardcoded fallback (Sep 2026)
+    return {
+        "period_begin": "2026-09-01", "period_end": "2026-09-30",
+        "inventory": 1510784, "inventory_yoy": 1.71,
+        "median_dom": 51, "median_dom_yoy": 1,
+        "months_of_supply": None, "months_of_supply_yoy": None,
+        "new_listings": 381191, "new_listings_yoy": -0.41,
+        "median_sale_price": 393895, "median_sale_price_yoy": 1.26,
+        "homes_sold": 282433, "homes_sold_yoy": -4.35,
+        "pct_price_drops": None, "pct_price_drops_yoy": None,
+        "avg_sale_to_list": None, "avg_sale_to_list_yoy": None,
+        "pct_sold_above_list": None, "pct_sold_above_list_yoy": None,
         "source": "fallback",
     }
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NewzipBot/1.0)"})
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            raw = gzip.decompress(resp.read())
-        reader = csv.DictReader(io.StringIO(raw.decode("utf-8")), delimiter="\t")
-        rows = list(reader)
-        if not rows:
-            print("  Redfin: empty file, using fallback")
-            return fallback
-        # Last row = most recent period
-        row = rows[-1]
-        def _f(key, divisor=1):
-            try: return round(float(row[key]) / divisor, 2)
-            except: return None
-        result = {
-            "period_begin":        row.get("period_begin", ""),
-            "period_end":          row.get("period_end", ""),
-            "inventory":           _f("inventory"),
-            "inventory_yoy":       _f("inventory_yoy") and round(_f("inventory_yoy") * 100, 1),
-            "median_dom":          _f("median_dom"),
-            "median_dom_yoy":      _f("median_dom_yoy"),
-            "months_of_supply":    _f("months_of_supply"),
-            "months_of_supply_yoy":_f("months_of_supply_yoy"),
-            "new_listings":        _f("new_listings"),
-            "new_listings_yoy":    _f("new_listings_yoy") and round(_f("new_listings_yoy") * 100, 1),
-            "median_sale_price":   _f("median_sale_price"),
-            "median_sale_price_yoy":_f("median_sale_price_yoy") and round(_f("median_sale_price_yoy") * 100, 1),
-            "homes_sold":          _f("homes_sold"),
-            "homes_sold_yoy":      _f("homes_sold_yoy") and round(_f("homes_sold_yoy") * 100, 1),
-            "pct_price_drops":     _f("pct_homes_with_price_drops") and round(_f("pct_homes_with_price_drops") * 100, 1),
-            "pct_price_drops_yoy": _f("pct_homes_with_price_drops_yoy") and round(_f("pct_homes_with_price_drops_yoy") * 100, 1),
-            "avg_sale_to_list":    _f("avg_sale_to_list") and round(_f("avg_sale_to_list") * 100, 1),
-            "pct_sold_above_list": _f("pct_homes_sold_above_list") and round(_f("pct_homes_sold_above_list") * 100, 1),
-            "source": "redfin",
-        }
-        print(f"  Redfin: {result['period_begin']} → {result['period_end']} | inventory {result['inventory']} | DOM {result['median_dom']}d | supply {result['months_of_supply']}mo")
-        return result
-    except Exception as e:
-        print(f"  Redfin: fetch failed ({e}), using hardcoded {fallback['period_end']} fallback")
-        return fallback
 
 
 def fetch_zillow_market():
@@ -964,7 +1024,7 @@ def fetch_pending():
 
 def build_housing_pulse_html(redfin, zillow):
     """
-    Render the Housing Market Pulse panel from Redfin + Zillow data.
+    Render the Housing Market Pulse panel from Realtor.com (primary) + Zillow data.
     Returns an HTML string for the pulse-grid div.
     """
     def _yoy_badge(val, invert=False):
@@ -1013,7 +1073,7 @@ def build_housing_pulse_html(redfin, zillow):
     zhvi_mom  = zillow.get("zhvi_mom")
     zhvi_per  = zillow.get("period", "")
 
-    # When Redfin is stale, the price cell uses the live Zillow index instead of an old sale price.
+    # When market data is stale, the price cell uses the live Zillow index instead of an old listing price.
     zhvi_live = bool(zhvi) and zillow.get("source") == "zillow"
     price_lbl = "Median Home Price"
     if stale and zhvi_live:
@@ -1023,16 +1083,24 @@ def build_housing_pulse_html(redfin, zillow):
         price_str = f"${price:,.0f}" if price else (f"${zhvi:,.0f} (ZHVI)" if zhvi else "N/A")
         price_yoy_val = price_yoy if price_yoy is not None else zhvi_yoy
 
+    src = redfin.get("source", "")
+    if src == "realtor":
+        src_label = "Realtor.com · realtor.com/research · Updated monthly"
+    elif src == "redfin_csv":
+        src_label = "Redfin Data Center (offline backup) · redfin.com/news/data-center"
+    else:
+        src_label = "Hardcoded fallback"
+
     if stale:
         old = f"{age['months']} months old" if age["months"] else "out of date"
         signal_desc += f" (as of {pd_str})"
         stale_html = (f'<div style="margin:.75rem 1.25rem 0;padding:.55rem .8rem;border:1px solid var(--nz-red);border-radius:6px;'
-                      f'font-size:.72rem;color:var(--nz-red);font-weight:600;">Redfin feed unavailable — these figures are from '
+                      f'font-size:.72rem;color:var(--nz-red);font-weight:600;">Housing data feed unavailable — these figures are from '
                       f'{pd_str} ({old}), not current conditions.</div>')
-        footer = f"Redfin Data Center · redfin.com/news/data-center · Last available period: {pd_str} · Feed currently unavailable"
+        footer = f"{src_label} · Last available period: {pd_str} · Feed currently unavailable"
     else:
         stale_html = ""
-        footer = f"Redfin Data Center · redfin.com/news/data-center · {pd_str} · Updated monthly · Cite Redfin when sharing"
+        footer = f"{src_label} · {pd_str}"
 
     return f"""
     {stale_html}
