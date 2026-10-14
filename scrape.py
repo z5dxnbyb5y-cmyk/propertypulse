@@ -3,7 +3,7 @@
 PropertyPulse / Newzip Market Tracker — scraper
 Sources: FRED API, Fannie Mae APIs, Inman RSS, Fortune RSS, HousingWire/MBA RSS
 """
-import os, re, json, datetime, gzip, csv, io, urllib.request, urllib.parse
+import os, re, json, datetime, gzip, csv, io, urllib.request, urllib.parse, urllib.error
 
 TODAY     = datetime.date.today()
 TODAY_STR = TODAY.strftime("%B %d, %Y")
@@ -92,6 +92,12 @@ def post(url, data, headers=None, timeout=20):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        # Print the server's error body — it says WHY (invalid_client, unauthorized_client, etc.)
+        try: detail = e.read().decode("utf-8", errors="replace")[:300]
+        except Exception: detail = ""
+        print(f"  WARN post {url}: HTTP {e.code} {e.reason} | body: {detail or '(empty)'}")
+        return ""
     except Exception as e:
         print(f"  WARN post {url}: {e}")
         return ""
@@ -128,6 +134,20 @@ def get_fannie_token():
 
     attempts = [
         # (endpoint, body, headers, label)
+        # fmsso-api is Fannie Mae's token host for system/API clients (per their Developer
+        # Portal migration doc); fmsso.fanniemae.com is the browser/portal SSO host.
+        (
+            "https://fmsso-api.fanniemae.com/as/token.oauth2",
+            {"grant_type": "client_credentials"},
+            {"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
+            "fmsso-api Basic Auth",
+        ),
+        (
+            "https://fmsso-api.fanniemae.com/as/token.oauth2",
+            {"grant_type": "client_credentials", "client_id": FANNIE_CLIENT_ID, "client_secret": FANNIE_CLIENT_SECRET},
+            {"Content-Type": "application/x-www-form-urlencoded"},
+            "fmsso-api body params",
+        ),
         (
             "https://fmsso.fanniemae.com/as/token.oauth2",
             {"grant_type": "client_credentials"},
@@ -176,7 +196,20 @@ def get_fannie_token():
 def fannie_get(path):
     token = get_fannie_token()
     if not token: return None
-    raw = fetch(FANNIE_BASE + path, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+    req = urllib.request.Request(FANNIE_BASE + path, headers={
+        "User-Agent": "NewzipMarketTracker/1.0",
+        "Authorization": f"Bearer {token}", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            raw = r.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        try: detail = e.read().decode("utf-8", errors="replace")[:300]
+        except Exception: detail = ""
+        print(f"  WARN FM GET {path}: HTTP {e.code} {e.reason} | body: {detail or '(empty)'}")
+        return None
+    except Exception as e:
+        print(f"  WARN FM GET {path}: {e}")
+        return None
     if not raw: return None
     try:
         return json.loads(raw)
