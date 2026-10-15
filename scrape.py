@@ -165,21 +165,64 @@ def get_fannie_token():
     return None
 
 
+_fannie_header_style = None  # index into _FANNIE_HEADER_STYLES that worked; found on first call
+
+_FANNIE_HEADER_STYLES = [
+    # (label, builder) — first is exactly what the Developer Portal guide shows
+    ("x-public-access-token (as documented)",
+     lambda t: {"x-public-access-token": t, "Content-Type": "application/json"}),
+    ("x-public-access-token, Accept only",
+     lambda t: {"x-public-access-token": t, "Accept": "application/json"}),
+    ("x-public-access-token with Bearer prefix",
+     lambda t: {"x-public-access-token": f"Bearer {t}", "Accept": "application/json"}),
+    ("Authorization: Bearer",
+     lambda t: {"Authorization": f"Bearer {t}", "Accept": "application/json"}),
+]
+
+def _fannie_request(url, headers, timeout=20):
+    """GET returning (status, body, response_headers) without swallowing errors."""
+    import urllib.error
+    h = {"User-Agent": "NewzipMarketTracker/1.0"}
+    h.update(headers)
+    req = urllib.request.Request(url, headers=h)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read().decode("utf-8", errors="replace"), dict(r.headers)
+    except urllib.error.HTTPError as e:
+        try: body = e.read().decode("utf-8", errors="replace")
+        except Exception: body = ""
+        return e.code, body, dict(e.headers or {})
+    except Exception as e:
+        return None, str(e), {}
+
 def fannie_get(path):
+    global _fannie_header_style
     token = get_fannie_token()
     if not token: return None
-    # Per the Developer Portal guide, public APIs take the token in x-public-access-token.
-    raw = fetch(FANNIE_BASE + path, headers={
-        "x-public-access-token": token,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    })
-    if not raw: return None
-    try:
-        return json.loads(raw)
-    except Exception as e:
-        print(f"  WARN FM JSON {path}: {e} — body: {raw[:200]}")
-        return None
+    url = FANNIE_BASE + path
+
+    styles = ([_fannie_header_style] if _fannie_header_style is not None
+              else range(len(_FANNIE_HEADER_STYLES)))
+    for i in styles:
+        label, build = _FANNIE_HEADER_STYLES[i]
+        status, body, rh = _fannie_request(url, build(token))
+        if status == 200:
+            if _fannie_header_style is None:
+                print(f"  Fannie API OK using header style: {label}")
+                _fannie_header_style = i
+            try:
+                return json.loads(body)
+            except Exception as e:
+                print(f"  WARN FM JSON {path}: {e} — body: {body[:200]}")
+                return None
+        # Log enough to diagnose: status, body, and any error-ish response headers
+        hint = {k: v for k, v in rh.items()
+                if k.lower() in ("www-authenticate", "x-error", "x-error-message",
+                                 "x-amzn-errortype", "x-correlation-id", "server", "content-type")}
+        print(f"  WARN FM {path} [{label}]: HTTP {status} body={body[:300]!r} headers={hint}")
+        if status in (404, 500):
+            break  # not a header problem — no point trying other styles
+    return None
 
 # ── FRED ──────────────────────────────────────────────────────────────────────
 
