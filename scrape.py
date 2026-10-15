@@ -3,15 +3,19 @@
 PropertyPulse / Newzip Market Tracker — scraper
 Sources: FRED API, Fannie Mae APIs, Inman RSS, Fortune RSS, HousingWire/MBA RSS
 """
-import os, re, json, datetime, gzip, csv, io, urllib.request, urllib.parse, urllib.error
+import os, re, json, datetime, gzip, csv, io, urllib.request, urllib.parse
 
 TODAY     = datetime.date.today()
 TODAY_STR = TODAY.strftime("%B %d, %Y")
 RUN_TS    = datetime.datetime.utcnow().strftime("%b %d, %Y %I:%M %p UTC")
 
 FRED_KEY             = os.environ.get("FRED_API_KEY", "")
-FANNIE_CLIENT_ID     = os.environ.get("FANNIE_CLIENT_ID", "")
-FANNIE_CLIENT_SECRET = os.environ.get("FANNIE_CLIENT_SECRET", "")
+FANNIE_CLIENT_ID     = os.environ.get("FANNIE_CLIENT_ID", "").strip()
+FANNIE_CLIENT_SECRET = os.environ.get("FANNIE_CLIENT_SECRET", "").strip()
+# Token URL from Fannie Mae Developer Portal > Get Started > Access Data (Public).
+# Can be overridden with a FANNIE_TOKEN_URL env var if Fannie Mae ever changes it.
+FANNIE_TOKEN_URL     = (os.environ.get("FANNIE_TOKEN_URL", "").strip()
+                        or "https://auth.pingone.com/4c2b23f9-52b1-4f8f-aa1f-1d477590770c/as/token")
 FANNIE_BASE          = "https://api.fanniemae.com"
 ANTHROPIC_API_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
 
@@ -73,6 +77,15 @@ LOGO_SRC = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTAiIGhlaWdodD0iMjAiIHZpZX
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 
+def _http_error_detail(e):
+    """Pull status + response body out of an HTTPError so auth failures are visible."""
+    import urllib.error
+    if isinstance(e, urllib.error.HTTPError):
+        try: body = e.read().decode("utf-8", errors="replace")[:500]
+        except Exception: body = ""
+        return f"HTTP {e.code} {e.reason} {body}".strip()
+    return str(e)
+
 def fetch(url, timeout=20, headers=None):
     h = {"User-Agent": "NewzipMarketTracker/1.0"}
     if headers: h.update(headers)
@@ -81,25 +94,19 @@ def fetch(url, timeout=20, headers=None):
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read().decode("utf-8", errors="replace")
     except Exception as e:
-        print(f"  WARN fetch {url}: {e}")
+        print(f"  WARN fetch {url}: {_http_error_detail(e)}")
         return ""
 
 def post(url, data, headers=None, timeout=20):
-    h = {"Content-Type": "application/x-www-form-urlencoded"}
+    h = {"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "NewzipMarketTracker/1.0"}
     if headers: h.update(headers)
     body = urllib.parse.urlencode(data).encode("utf-8")
     req = urllib.request.Request(url, data=body, headers=h, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
-        # Print the server's error body — it says WHY (invalid_client, unauthorized_client, etc.)
-        try: detail = e.read().decode("utf-8", errors="replace")[:300]
-        except Exception: detail = ""
-        print(f"  WARN post {url}: HTTP {e.code} {e.reason} | body: {detail or '(empty)'}")
-        return ""
     except Exception as e:
-        print(f"  WARN post {url}: {e}")
+        print(f"  WARN post {url}: {_http_error_detail(e)}")
         return ""
 
 # ── FANNIE MAE OAUTH ──────────────────────────────────────────────────────────
@@ -109,10 +116,9 @@ _fannie_token_expiry = None
 _fannie_token_failed = False  # set True after first complete failure; skip retries
 
 def get_fannie_token():
-    """Authenticate with Fannie Mae Exchange APIs using Ping Identity SSO.
-    Token endpoint: https://fmsso.fanniemae.com/as/token.oauth2
-    Grant type: client_credentials (Basic Auth with client_id:client_secret)
-    Discovery: https://fmsso.fanniemae.com/.well-known/openid-configuration
+    """Client-credentials token for Fannie Mae public APIs, per the Developer Portal guide:
+    POST FANNIE_TOKEN_URL with Basic base64(client_id:client_secret) and
+    grant_type=client_credentials. Tokens last 1 hour.
     """
     global _fannie_token, _fannie_token_expiry, _fannie_token_failed
     if _fannie_token_failed:
@@ -120,75 +126,41 @@ def get_fannie_token():
     if _fannie_token and _fannie_token_expiry and datetime.datetime.utcnow() < _fannie_token_expiry:
         return _fannie_token
     if not FANNIE_CLIENT_ID or not FANNIE_CLIENT_SECRET:
-        print("  WARN: Fannie Mae credentials not set")
+        print("  WARN: Fannie Mae credentials not set (FANNIE_CLIENT_ID / FANNIE_CLIENT_SECRET)")
+        _fannie_token_failed = True
         return None
 
-    print("  Authenticating with Fannie Mae Exchange (Ping Identity SSO)...")
-
     import base64 as _b64
-
-    # Fannie Mae uses Ping Identity (PingFederate) for OAuth2.
-    # Primary: fmsso.fanniemae.com (confirmed via /.well-known/openid-configuration)
-    # Try both Basic Auth header AND body params — PingFederate accepts either.
     creds = _b64.b64encode(f"{FANNIE_CLIENT_ID}:{FANNIE_CLIENT_SECRET}".encode()).decode()
+    basic = {"Authorization": f"Basic {creds}", "Accept": "application/json"}
+    form  = {"grant_type": "client_credentials", "client_id": FANNIE_CLIENT_ID,
+             "client_secret": FANNIE_CLIENT_SECRET}
 
     attempts = [
-        # (endpoint, body, headers, label)
-        # fmsso-api is Fannie Mae's token host for system/API clients (per their Developer
-        # Portal migration doc); fmsso.fanniemae.com is the browser/portal SSO host.
-        (
-            "https://fmsso-api.fanniemae.com/as/token.oauth2",
-            {"grant_type": "client_credentials"},
-            {"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
-            "fmsso-api Basic Auth",
-        ),
-        (
-            "https://fmsso-api.fanniemae.com/as/token.oauth2",
-            {"grant_type": "client_credentials", "client_id": FANNIE_CLIENT_ID, "client_secret": FANNIE_CLIENT_SECRET},
-            {"Content-Type": "application/x-www-form-urlencoded"},
-            "fmsso-api body params",
-        ),
-        (
-            "https://fmsso.fanniemae.com/as/token.oauth2",
-            {"grant_type": "client_credentials"},
-            {"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
-            "fmsso Basic Auth",
-        ),
-        (
-            "https://fmsso.fanniemae.com/as/token.oauth2",
-            {"grant_type": "client_credentials", "client_id": FANNIE_CLIENT_ID, "client_secret": FANNIE_CLIENT_SECRET},
-            {"Content-Type": "application/x-www-form-urlencoded"},
-            "fmsso body params",
-        ),
-        (
-            "https://api.fanniemae.com/v1/oauth2/token",
-            {"grant_type": "client_credentials", "client_id": FANNIE_CLIENT_ID, "client_secret": FANNIE_CLIENT_SECRET},
-            {"Content-Type": "application/x-www-form-urlencoded"},
-            "api.fanniemae body params",
-        ),
+        (FANNIE_TOKEN_URL, {"grant_type": "client_credentials"}, basic, "Basic auth"),
+        (FANNIE_TOKEN_URL, form, {"Accept": "application/json"}, "body params"),
     ]
 
     for endpoint, body, headers, label in attempts:
-        print(f"  Trying: {label}")
+        print(f"  Trying token: {label}")
         raw = post(endpoint, body, headers=headers)
-        if raw:
-            try:
-                data = json.loads(raw)
-                token = data.get("access_token") or data.get("id_token")
-                if token:
-                    exp = int(data.get("expires_in", 3600))
-                    _fannie_token = token
-                    _fannie_token_expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=exp - 60)
-                    print(f"  Token OK via {label} (expires {exp}s)")
-                    return _fannie_token
-                else:
-                    print(f"  No token from {label}: {list(data.keys())}")
-            except Exception as e:
-                print(f"  Parse error from {label}: {e}")
-        else:
-            print(f"  No response from {label}")
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except Exception:
+            print(f"  Non-JSON token response: {raw[:200]}")
+            continue
+        token = data.get("access_token")
+        if token:
+            exp = int(data.get("expires_in", 3600))
+            _fannie_token = token
+            _fannie_token_expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=max(exp - 60, 60))
+            print(f"  Token OK via {label} (expires {exp}s)")
+            return _fannie_token
+        print(f"  No access_token from {label}: {data}")
 
-    print("  All Fannie Mae token endpoints failed")
+    print("  All Fannie Mae token attempts failed — see HTTP errors above")
     _fannie_token_failed = True
     return None
 
@@ -196,25 +168,17 @@ def get_fannie_token():
 def fannie_get(path):
     token = get_fannie_token()
     if not token: return None
-    req = urllib.request.Request(FANNIE_BASE + path, headers={
-        "User-Agent": "NewzipMarketTracker/1.0",
-        "Authorization": f"Bearer {token}", "Accept": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            raw = r.read().decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
-        try: detail = e.read().decode("utf-8", errors="replace")[:300]
-        except Exception: detail = ""
-        print(f"  WARN FM GET {path}: HTTP {e.code} {e.reason} | body: {detail or '(empty)'}")
-        return None
-    except Exception as e:
-        print(f"  WARN FM GET {path}: {e}")
-        return None
+    # Per the Developer Portal guide, public APIs take the token in x-public-access-token.
+    raw = fetch(FANNIE_BASE + path, headers={
+        "x-public-access-token": token,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    })
     if not raw: return None
     try:
         return json.loads(raw)
     except Exception as e:
-        print(f"  WARN FM JSON {path}: {e}")
+        print(f"  WARN FM JSON {path}: {e} — body: {raw[:200]}")
         return None
 
 # ── FRED ──────────────────────────────────────────────────────────────────────
