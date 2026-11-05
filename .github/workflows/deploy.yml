@@ -27,4 +27,6 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           channelId: live
           projectId: newzip-propertypulse
+          # firebase-tools 15.34.1+ fails with a 403 on serviceusage.services.get (firebase/firebase-tools#11335)
+          firebaseToolsVersion: 15.34.0
           force: true
